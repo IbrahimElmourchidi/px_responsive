@@ -209,11 +209,11 @@ if (isDesktop) {
 
 // Enum for switch statements
 switch (deviceType) {
-  case EasyDeviceType.mobile:
+  case PxDeviceType.mobile:
     return MobileLayout();
-  case EasyDeviceType.tablet:
+  case PxDeviceType.tablet:
     return TabletLayout();
-  case EasyDeviceType.desktop:
+  case PxDeviceType.desktop:
     return DesktopLayout();
 }
 
