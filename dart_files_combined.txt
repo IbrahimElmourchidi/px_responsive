@@ -1,0 +1,2391 @@
+// File: ./accumilator.dart
+// ignore_for_file: avoid_print
+
+import 'dart:io';
+
+void main(List<String> arguments) async {
+  // Directory to scan (use current directory by default, or pass as argument)
+  final String targetDir = arguments.isNotEmpty ? arguments[0] : '.';
+  final String outputFile = 'dart_files_combined.txt';
+
+  final Directory directory = Directory(targetDir);
+
+  // Check if directory exists
+  if (!await directory.exists()) {
+    print('Error: Directory "$targetDir" does not exist.');
+    return;
+  }
+
+  // Create or clear the output file
+  final File output = File(outputFile);
+  await output.create(recursive: true);
+  await output.writeAsString(''); // Clear the file
+
+  print('Scanning directory: $targetDir');
+  print('Output file: $outputFile');
+
+  int fileCount = 0;
+
+  // Recursively get all dart files
+  final Stream<FileSystemEntity> entities = directory.list(
+    recursive: true,
+    followLinks: false,
+  );
+
+  await for (final FileSystemEntity entity in entities) {
+    if (entity is File) {
+      // Get the file path and convert to use consistent separators
+      String filePath = entity.path.replaceAll('\\', '/');
+      String targetDirPath = targetDir.replaceAll('\\', '/');
+
+      // Check if it's a Dart file
+      //!filePath.toLowerCase().contains('node_modules')
+      //
+      if (filePath.toLowerCase().endsWith('.dart') ||
+          filePath.toLowerCase().endsWith('.md') ||
+          filePath.toLowerCase().endsWith('.yaml')) {
+        // Calculate relative path
+        String relativePath;
+        if (targetDirPath == '.' || targetDirPath.isEmpty) {
+          relativePath = filePath;
+        } else {
+          // Remove the target directory prefix
+          if (filePath.startsWith('$targetDirPath/')) {
+            relativePath = filePath.substring(targetDirPath.length + 1);
+          } else {
+            relativePath = filePath;
+          }
+        }
+
+        final String fileContent = await entity.readAsString();
+
+        // Append to output file with path comment
+        await output.writeAsString(
+          '// File: $relativePath\n'
+          '$fileContent\n\n'
+          '//------------------------------------------------------------------------------\n\n',
+          mode: FileMode.append,
+        );
+
+        fileCount++;
+        print('Processed: $relativePath');
+      }
+    }
+  }
+
+  print('\nDone! Processed $fileCount Dart files.');
+  print('Combined output saved to: $outputFile');
+}
+
+
+// dart accumilator.dart functions/src
+
+//------------------------------------------------------------------------------
+
+// File: ./analysis_options.yaml
+# This file configures the analyzer, which statically analyzes Dart code to
+# check for errors, warnings, and lints.
+#
+# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
+# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
+# invoked from the command line by running `flutter analyze`.
+
+# The following line activates a set of recommended lints for Flutter apps,
+# packages, and plugins designed to encourage good coding practices.
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  # The lint rules applied to this project can be customized in the
+  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
+  # included above or to enable additional rules. A list of all available lints
+  # and their documentation is published at https://dart.dev/lints.
+  #
+  # Instead of disabling a lint rule for the entire project in the
+  # section below, it can also be suppressed for a single line of code
+  # or a specific dart file by using the `// ignore: name_of_lint` and
+  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
+  # producing the lint.
+  rules:
+    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
+    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    public_member_api_docs: true
+    sort_pub_dependencies: true
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    prefer_final_fields: true
+    prefer_final_locals: true
+    unnecessary_this: true
+    avoid_redundant_argument_values: true
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+  errors:
+    missing_required_param: error
+    missing_return: error
+    public_member_api_docs: warning
+
+//------------------------------------------------------------------------------
+
+// File: ./CHANGELOG.md
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.0.1] - 2025-01-10
+
+### Added
+
+- Initial release of px_responsive
+- `PxResponsiveConfig` - Configuration class for design baselines and breakpoints
+- `PxResponsive` - Singleton core for calculating scale factors
+- `PxResponsiveWrapper` - Widget wrapper for initializing the responsive system
+- `PxResponsiveMediaQueryWrapper` - Alternative wrapper using MediaQuery
+- Numeric extensions (`.w`, `.h`, `.sp`, `.r`, `.wf`, `.hf`)
+- Parent-relative extensions (`.wr()`, `.hr()`)
+- Clamping methods (`.wMin()`, `.wMax()`, `.wClamp()`, etc.)
+- `EdgeInsets` extensions (`.w`, `.scaled`, `.r`)
+- `Size` extensions (`.scaled`, `.w`, `.r`)
+- `BorderRadius` extensions (`.r`)
+- `PxResponsiveBuilder` - Widget for device-specific layouts
+- `PxResponsiveValue` - Widget for device-specific values
+- `PxResponsiveVisibility` - Widget for conditional visibility
+- `BuildContext` extensions for convenient access
+- Scale factor clamping to prevent extreme UI scaling
+- Separate text scale factor limit (`maxTextScaleFactor`)
+- Full documentation for all public APIs
+
+//------------------------------------------------------------------------------
+
+// File: ./example/lib/main.dart
+import 'package:flutter/widgets.dart';
+import 'package:px_responsive/src/px_responsive_config.dart';
+import 'package:px_responsive/src/px_responsive_core.dart';
+import 'package:px_responsive/px_responsive.dart';
+
+// ============================================================================
+// RESPONSIVE BUILDER - Build different widgets per device type
+// ============================================================================
+
+/// A builder widget that builds different layouts based on device type.
+///
+/// Use this widget when you need completely different widget trees
+/// for different device types (mobile, tablet, desktop).
+///
+/// ## When to Use
+///
+/// - Different page layouts per device (e.g., single column vs multi-column)
+/// - Different navigation patterns (bottom nav vs side nav)
+/// - Completely different UI structures that can't be achieved with just scaling
+///
+/// ## Basic Example
+///
+/// ```dart
+/// PxResponsiveBuilder(
+///   mobile: (context) => const MobileLayout(),
+///   tablet: (context) => const TabletLayout(),
+///   desktop: (context) => const DesktopLayout(),
+/// )
+/// ```
+///
+/// ## With Fallback
+///
+/// If [tablet] or [desktop] are not provided, they fall back to smaller sizes:
+///
+/// ```dart
+/// PxResponsiveBuilder(
+///   mobile: (context) => const MobileLayout(),
+///   desktop: (context) => const DesktopLayout(),
+///   // Tablet will use MobileLayout
+/// )
+///
+/// PxResponsiveBuilder(
+///   mobile: (context) => const MobileLayout(),
+///   // Both tablet and desktop will use MobileLayout
+/// )
+/// ```
+///
+/// ## Real-World Example
+///
+/// ```dart
+/// PxResponsiveBuilder(
+///   mobile: (context) => Scaffold(
+///     appBar: AppBar(title: const Text('My App')),
+///     drawer: const NavigationDrawer(),
+///     body: const ContentList(),
+///     bottomNavigationBar: const BottomNavBar(),
+///   ),
+///   tablet: (context) => Scaffold(
+///     body: Row(
+///       children: [
+///         const NavigationRail(),
+///         const Expanded(child: ContentList()),
+///       ],
+///     ),
+///   ),
+///   desktop: (context) => Scaffold(
+///     body: Row(
+///       children: [
+///         const SideNavigation(expanded: true),
+///         const Expanded(child: ContentList()),
+///         const DetailPanel(),
+///       ],
+///     ),
+///   ),
+/// )
+/// ```
+///
+/// ## Comparison with responsiveValue
+///
+/// Use [PxResponsiveBuilder] when you need different widget trees.
+/// Use [responsiveValue] when you need different values for the same widget.
+///
+/// ```dart
+/// // Use PxResponsiveBuilder for different structures
+/// PxResponsiveBuilder(
+///   mobile: (context) => ListView(...),
+///   desktop: (context) => GridView(...),
+/// )
+///
+/// // Use responsiveValue for different values
+/// Container(
+///   width: responsiveValue(mobile: 100.w, desktop: 200.w),
+/// )
+/// ```
+///
+/// See also:
+/// - [PxResponsiveValue] for providing different values (not widgets)
+/// - [PxResponsiveVisibility] for showing/hiding widgets
+/// - [responsiveValue] for inline value selection
+class PxResponsiveBuilder extends StatelessWidget {
+  /// Builder function for mobile layout.
+  ///
+  /// Called when screen width < [PxResponsiveConfig.mobileBreakpoint].
+  ///
+  /// This is required and serves as the fallback for [tablet] and [desktop]
+  /// if they are not provided.
+  final WidgetBuilder mobile;
+
+  /// Builder function for tablet layout.
+  ///
+  /// Called when [PxResponsiveConfig.mobileBreakpoint] <= width < [PxResponsiveConfig.tabletBreakpoint].
+  ///
+  /// If null, falls back to [mobile].
+  final WidgetBuilder? tablet;
+
+  /// Builder function for desktop layout.
+  ///
+  /// Called when screen width >= [PxResponsiveConfig.tabletBreakpoint].
+  ///
+  /// If null, falls back to [tablet]. If [tablet] is also null, falls back to [mobile].
+  final WidgetBuilder? desktop;
+
+  /// Creates a responsive builder widget.
+  ///
+  /// [mobile] is required and serves as the fallback for other device types.
+  ///
+  /// ## Parameters
+  ///
+  /// - [mobile]: Required. Builder for mobile layout.
+  /// - [tablet]: Optional. Builder for tablet layout. Falls back to [mobile].
+  /// - [desktop]: Optional. Builder for desktop layout. Falls back to [tablet] or [mobile].
+  const PxResponsiveBuilder({
+    super.key,
+    required this.mobile,
+    this.tablet,
+    this.desktop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = PxResponsive();
+
+    if (responsive.isDesktop) {
+      return (desktop ?? tablet ?? mobile)(context);
+    }
+    if (responsive.isTablet) {
+      return (tablet ?? mobile)(context);
+    }
+    return mobile(context);
+  }
+}
+
+// ============================================================================
+// RESPONSIVE VALUE - Provide different values per device type
+// ============================================================================
+
+/// A widget that provides different values based on device type.
+///
+/// Similar to [PxResponsiveBuilder] but instead of building different widgets,
+/// it provides a value to a builder function. This is useful when the widget
+/// structure is the same but configuration differs.
+///
+/// ## When to Use
+///
+/// - Same widget structure with different configuration per device
+/// - Grid column counts
+/// - Axis counts for lists
+/// - Spacing values
+/// - Any typed value that varies by device
+///
+/// ## Basic Example
+///
+/// ```dart
+/// PxResponsiveValue<int>(
+///   mobile: 2,
+///   tablet: 3,
+///   desktop: 4,
+///   builder: (context, columnCount) {
+///     return GridView.count(
+///       crossAxisCount: columnCount,
+///       children: items,
+///     );
+///   },
+/// )
+/// ```
+///
+/// ## With Complex Types
+///
+/// ```dart
+/// PxResponsiveValue<EdgeInsets>(
+///   mobile: const EdgeInsets.all(8),
+///   tablet: const EdgeInsets.all(16),
+///   desktop: const EdgeInsets.all(24),
+///   builder: (context, padding) {
+///     return Padding(
+///       padding: padding,
+///       child: const Content(),
+///     );
+///   },
+/// )
+/// ```
+///
+/// ## With Custom Objects
+///
+/// ```dart
+/// class LayoutConfig {
+///   final int columns;
+///   final double spacing;
+///   final bool showSidebar;
+///
+///   const LayoutConfig({
+///     required this.columns,
+///     required this.spacing,
+///     required this.showSidebar,
+///   });
+/// }
+///
+/// PxResponsiveValue<LayoutConfig>(
+///   mobile: const LayoutConfig(columns: 1, spacing: 8, showSidebar: false),
+///   tablet: const LayoutConfig(columns: 2, spacing: 12, showSidebar: false),
+///   desktop: const LayoutConfig(columns: 3, spacing: 16, showSidebar: true),
+///   builder: (context, config) {
+///     return Row(
+///       children: [
+///         if (config.showSidebar) const Sidebar(),
+///         Expanded(
+///           child: GridView.count(
+///             crossAxisCount: config.columns,
+///             mainAxisSpacing: config.spacing,
+///             crossAxisSpacing: config.spacing,
+///             children: items,
+///           ),
+///         ),
+///       ],
+///     );
+///   },
+/// )
+/// ```
+///
+/// ## Fallback Behavior
+///
+/// Like [PxResponsiveBuilder], values fall back to smaller sizes:
+/// - Desktop uses [desktop] ?? [tablet] ?? [mobile]
+/// - Tablet uses [tablet] ?? [mobile]
+/// - Mobile always uses [mobile]
+///
+/// ## Comparison with responsiveValue Function
+///
+/// [PxResponsiveValue] is a widget, [responsiveValue] is a function.
+/// Use the function for inline values, use the widget when you need
+/// the value in a builder context.
+///
+/// ```dart
+/// // Function (inline)
+/// Container(width: responsiveValue(mobile: 100, desktop: 200))
+///
+/// // Widget (builder context)
+/// PxResponsiveValue<int>(
+///   mobile: 2,
+///   desktop: 4,
+///   builder: (context, count) => GridView.count(crossAxisCount: count),
+/// )
+/// ```
+class PxResponsiveValue<T> extends StatelessWidget {
+  /// Value for mobile layout.
+  ///
+  /// This is required and serves as the fallback for [tablet] and [desktop].
+  final T mobile;
+
+  /// Value for tablet layout.
+  ///
+  /// If null, falls back to [mobile].
+  final T? tablet;
+
+  /// Value for desktop layout.
+  ///
+  /// If null, falls back to [tablet]. If [tablet] is also null, falls back to [mobile].
+  final T? desktop;
+
+  /// Builder function that receives the appropriate value for current device.
+  ///
+  /// This is called with the selected value based on device type.
+  final Widget Function(BuildContext context, T value) builder;
+
+  /// Creates a responsive value widget.
+  ///
+  /// ## Parameters
+  ///
+  /// - [mobile]: Required. Value for mobile devices.
+  /// - [tablet]: Optional. Value for tablets. Falls back to [mobile].
+  /// - [desktop]: Optional. Value for desktop. Falls back to [tablet] or [mobile].
+  /// - [builder]: Required. Builder that receives the selected value.
+  const PxResponsiveValue({
+    super.key,
+    required this.mobile,
+    this.tablet,
+    this.desktop,
+    required this.builder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = PxResponsive();
+    T value;
+
+    if (responsive.isDesktop) {
+      value = desktop ?? tablet ?? mobile;
+    } else if (responsive.isTablet) {
+      value = tablet ?? mobile;
+    } else {
+      value = mobile;
+    }
+
+    return builder(context, value);
+  }
+}
+
+// ============================================================================
+// RESPONSIVE VISIBILITY - Show/hide widgets per device type
+// ============================================================================
+
+/// A widget that conditionally shows or hides its child based on device type.
+///
+/// Use this for showing different UI elements on different devices,
+/// such as navigation patterns, optional panels, or device-specific features.
+///
+/// ## Basic Example
+///
+/// ```dart
+/// // Only show sidebar on tablet and desktop
+/// PxResponsiveVisibility(
+///   visibleOnMobile: false,
+///   visibleOnTablet: true,
+///   visibleOnDesktop: true,
+///   child: const Sidebar(),
+/// )
+/// ```
+///
+/// ## Named Constructors
+///
+/// For common patterns, use the named constructors:
+///
+/// ```dart
+/// // Only on mobile
+/// PxResponsiveVisibility.mobile(child: const BottomNavBar())
+///
+/// // Only on tablet
+/// PxResponsiveVisibility.tablet(child: const TabletMenu())
+///
+/// // Only on desktop
+/// PxResponsiveVisibility.desktop(child: const DesktopToolbar())
+///
+/// // Tablet and desktop (not mobile)
+/// PxResponsiveVisibility.tabletUp(child: const SideNavigation())
+///
+/// // Mobile and tablet (not desktop)
+/// PxResponsiveVisibility.tabletDown(child: const CompactHeader())
+/// ```
+///
+/// ## With Replacement Widget
+///
+/// Show an alternative widget when hidden:
+///
+/// ```dart
+/// PxResponsiveVisibility(
+///   visibleOnMobile: false,
+///   visibleOnTablet: true,
+///   visibleOnDesktop: true,
+///   replacement: const MobileDrawerButton(),
+///   child: const SideNavigation(),
+/// )
+/// ```
+///
+/// ## Maintaining State
+///
+/// Use [maintainState] to keep the widget in the tree but hidden:
+///
+/// ```dart
+/// PxResponsiveVisibility.desktop(
+///   maintainState: true, // Widget stays in tree, just hidden
+///   child: const ExpensiveWidget(),
+/// )
+/// ```
+///
+/// This is useful when:
+/// - The child has state you want to preserve across device changes
+/// - The child is expensive to rebuild
+/// - You're animating visibility changes
+///
+/// ## Real-World Example
+///
+/// ```dart
+/// Scaffold(
+///   body: Row(
+///     children: [
+///       // Side navigation only on tablet and desktop
+///       PxResponsiveVisibility.tabletUp(
+///         child: const SideNavigation(),
+///       ),
+///       // Main content
+///       const Expanded(child: MainContent()),
+///       // Detail panel only on desktop
+///       PxResponsiveVisibility.desktop(
+///         child: const DetailPanel(),
+///       ),
+///     ],
+///   ),
+///   // Bottom navigation only on mobile
+///   bottomNavigationBar: PxResponsiveVisibility.mobile(
+///     child: const BottomNavBar(),
+///   ),
+/// )
+/// ```
+///
+/// ## Visibility Summary
+///
+/// | Constructor | Mobile | Tablet | Desktop |
+/// |-------------|--------|--------|---------|
+/// | `.mobile()` | ✅ | ❌ | ❌ |
+/// | `.tablet()` | ❌ | ✅ | ❌ |
+/// | `.desktop()` | ❌ | ❌ | ✅ |
+/// | `.tabletUp()` | ❌ | ✅ | ✅ |
+/// | `.tabletDown()` | ✅ | ✅ | ❌ |
+///
+/// See also:
+/// - [PxResponsiveBuilder] for completely different layouts
+/// - [PxResponsiveValue] for different values with same structure
+class PxResponsiveVisibility extends StatelessWidget {
+  /// The child widget to conditionally show.
+  final Widget child;
+
+  /// Whether to show the child on mobile devices.
+  ///
+  /// Default: `true`
+  final bool visibleOnMobile;
+
+  /// Whether to show the child on tablet devices.
+  ///
+  /// Default: `true`
+  final bool visibleOnTablet;
+
+  /// Whether to show the child on desktop devices.
+  ///
+  /// Default: `true`
+  final bool visibleOnDesktop;
+
+  /// Optional replacement widget when child is hidden.
+  ///
+  /// If null, uses `SizedBox.shrink()` (takes no space).
+  ///
+  /// ## Example
+  ///
+  /// ```dart
+  /// PxResponsiveVisibility.tabletUp(
+  ///   replacement: const IconButton(
+  ///     icon: Icon(Icons.menu),
+  ///     onPressed: openDrawer,
+  ///   ),
+  ///   child: const SideNavigation(),
+  /// )
+  /// ```
+  final Widget? replacement;
+
+  /// Whether to maintain the child's state when hidden.
+  ///
+  /// If `true`, wraps child in [Offstage] instead of replacing it.
+  /// The child remains in the widget tree but is not painted or
+  /// interactive.
+  ///
+  /// Default: `false`
+  ///
+  /// ## When to Use
+  ///
+  /// - Child has state you want to preserve
+  /// - Child is expensive to rebuild
+  /// - You need to animate visibility transitions
+  ///
+  /// ## Example
+  ///
+  /// ```dart
+  /// PxResponsiveVisibility.desktop(
+  ///   maintainState: true,
+  ///   child: const VideoPlayer(), // Keeps playing when hidden
+  /// )
+  /// ```
+  final bool maintainState;
+
+  /// Creates a responsive visibility widget.
+  ///
+  /// By default, the child is visible on all device types.
+  /// Set [visibleOnMobile], [visibleOnTablet], or [visibleOnDesktop]
+  /// to `false` to hide on specific devices.
+  ///
+  /// ## Parameters
+  ///
+  /// - [child]: Required. The widget to conditionally show.
+  /// - [visibleOnMobile]: Show on mobile. Default: `true`
+  /// - [visibleOnTablet]: Show on tablet. Default: `true`
+  /// - [visibleOnDesktop]: Show on desktop. Default: `true`
+  /// - [replacement]: Widget to show when hidden. Default: `SizedBox.shrink()`
+  /// - [maintainState]: Keep child in tree when hidden. Default: `false`
+  const PxResponsiveVisibility({
+    super.key,
+    required this.child,
+    this.visibleOnMobile = true,
+    this.visibleOnTablet = true,
+    this.visibleOnDesktop = true,
+    this.replacement,
+    this.maintainState = false,
+  });
+
+  /// Creates a visibility widget that only shows on mobile.
+  ///
+  /// Visible: Mobile ✅ | Tablet ❌ | Desktop ❌
+  ///
+  /// ## Example
+  ///
+  /// ```dart
+  /// PxResponsiveVisibility.mobile(
+  ///   child: const BottomNavigationBar(),
+  /// )
+  /// ```
+  const PxResponsiveVisibility.mobile({
+    super.key,
+    required this.child,
+    this.replacement,
+    this.maintainState = false,
+  })  : visibleOnMobile = true,
+        visibleOnTablet = false,
+        visibleOnDesktop = false;
+
+  /// Creates a visibility widget that only shows on tablet.
+  ///
+  /// Visible: Mobile ❌ | Tablet ✅ | Desktop ❌
+  ///
+  /// ## Example
+  ///
+  /// ```dart
+  /// PxResponsiveVisibility.tablet(
+  ///   child: const TabletSpecificWidget(),
+  /// )
+  /// ```
+  const PxResponsiveVisibility.tablet({
+    super.key,
+    required this.child,
+    this.replacement,
+    this.maintainState = false,
+  })  : visibleOnMobile = false,
+        visibleOnTablet = true,
+        visibleOnDesktop = false;
+
+  /// Creates a visibility widget that only shows on desktop.
+  ///
+  /// Visible: Mobile ❌ | Tablet ❌ | Desktop ✅
+  ///
+  /// ## Example
+  ///
+  /// ```dart
+  /// PxResponsiveVisibility.desktop(
+  ///   child: const DesktopToolbar(),
+  /// )
+  /// ```
+  const PxResponsiveVisibility.desktop({
+    super.key,
+    required this.child,
+    this.replacement,
+    this.maintainState = false,
+  })  : visibleOnMobile = false,
+        visibleOnTablet = false,
+        visibleOnDesktop = true;
+
+  /// Creates a visibility widget that shows on tablet and desktop (not mobile).
+  ///
+  /// Visible: Mobile ❌ | Tablet ✅ | Desktop ✅
+  ///
+  /// Use for elements that need more screen space, like side navigation.
+  ///
+  /// ## Example
+  ///
+  /// ```dart
+  /// PxResponsiveVisibility.tabletUp(
+  ///   child: const SideNavigation(),
+  /// )
+  /// ```
+  const PxResponsiveVisibility.tabletUp({
+    super.key,
+    required this.child,
+    this.replacement,
+    this.maintainState = false,
+  })  : visibleOnMobile = false,
+        visibleOnTablet = true,
+        visibleOnDesktop = true;
+
+  /// Creates a visibility widget that shows on mobile and tablet (not desktop).
+  ///
+  /// Visible: Mobile ✅ | Tablet ✅ | Desktop ❌
+  ///
+  /// Use for mobile-oriented elements that aren't needed on desktop.
+  ///
+  /// ## Example
+  ///
+  /// ```dart
+  /// PxResponsiveVisibility.tabletDown(
+  ///   child: const TouchOptimizedControls(),
+  /// )
+  /// ```
+  const PxResponsiveVisibility.tabletDown({
+    super.key,
+    required this.child,
+    this.replacement,
+    this.maintainState = false,
+  })  : visibleOnMobile = true,
+        visibleOnTablet = true,
+        visibleOnDesktop = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = PxResponsive();
+    bool isVisible;
+
+    if (responsive.isDesktop) {
+      isVisible = visibleOnDesktop;
+    } else if (responsive.isTablet) {
+      isVisible = visibleOnTablet;
+    } else {
+      isVisible = visibleOnMobile;
+    }
+
+    // If maintainState is true, use Offstage to keep widget in tree
+    if (maintainState) {
+      return Offstage(
+        offstage: !isVisible,
+        child: child,
+      );
+    }
+
+    // Otherwise, swap between child and replacement
+    return isVisible ? child : (replacement ?? const SizedBox.shrink());
+  }
+}
+
+
+//------------------------------------------------------------------------------
+
+// File: ./lib/px_responsive.dart
+/// A powerful tri-tier responsive design system for Flutter.
+///
+/// This package provides automatic UI scaling across mobile, tablet, and desktop
+/// platforms based on your Figma/XD design specifications.
+///
+/// ## Getting Started
+///
+/// 1. Wrap your app with [PxResponsiveWrapper]:
+///
+/// ```dart
+/// void main() {
+///   runApp(
+///     PxResponsiveWrapper(
+///       config: const PxResponsiveConfig(
+///         desktop: Size(1920, 1080),
+///         tablet: Size(834, 1194),
+///         mobile: Size(375, 812),
+///       ),
+///       child: const MyApp(),
+///     ),
+///   );
+/// }
+/// ```
+///
+/// 2. Use the extensions in your widgets:
+///
+/// ```dart
+/// Container(
+///   width: 200.w,   // Scales width based on design
+///   height: 100.h,  // Scales height based on design
+///   child: Text(
+///     'Hello',
+///     style: TextStyle(fontSize: 16.sp),
+///   ),
+/// )
+/// ```
+///
+/// 3. Check device type with simple global getters:
+///
+/// ```dart
+/// if (isMobile) {
+///   // Mobile-specific code
+/// }
+/// ```
+///
+/// 4. Use [responsiveValue] for device-specific values:
+///
+/// ```dart
+/// width: responsiveValue(mobile: 120.w, tablet: 160.w, desktop: 200.w)
+/// ```
+///
+/// ## Extensions Reference
+///
+/// | Extension | Description |
+/// |-----------|-------------|
+/// | `.w` | Width scaled by design ratio |
+/// | `.h` | Height scaled by design ratio |
+/// | `.sp` | Font size (with tighter max) |
+/// | `.r` | Radius using min(scaleW, scaleH) |
+/// | `.wf` | Percentage of window width |
+/// | `.hf` | Percentage of window height |
+/// | `.wr(context)` | Percentage of parent width |
+/// | `.hr(context)` | Percentage of parent height |
+///
+/// ## Global Getters
+///
+/// | Getter | Type | Description |
+/// |--------|------|-------------|
+/// | [isMobile] | `bool` | True if mobile layout |
+/// | [isTablet] | `bool` | True if tablet layout |
+/// | [isDesktop] | `bool` | True if desktop layout |
+/// | [deviceType] | `PxDeviceType` | Current device type enum |
+/// | [screenWidth] | `double` | Current screen width |
+/// | [screenHeight] | `double` | Current screen height |
+library;
+
+export 'src/px_responsive_config.dart';
+export 'src/px_responsive_core.dart';
+export 'src/px_responsive_wrapper.dart';
+export 'src/px_responsive_extensions.dart';
+export 'src/px_responsive_builder.dart';
+
+
+//------------------------------------------------------------------------------
+
+// File: ./lib/src/px_responsive_builder.dart
+import 'package:flutter/widgets.dart';
+import 'px_responsive_config.dart';
+import 'px_responsive_core.dart';
+
+// ============================================================================
+// RESPONSIVE BUILDER - Build different widgets per device type
+// ============================================================================
+
+/// A builder widget that builds different layouts based on device type.
+///
+/// Use this widget when you need completely different widget trees
+/// for different device types (mobile, tablet, desktop).
+///
+/// ## Basic Example
+///
+/// ```dart
+/// PxResponsiveBuilder(
+///   mobile: (context) => const MobileLayout(),
+///   tablet: (context) => const TabletLayout(),
+///   desktop: (context) => const DesktopLayout(),
+/// )
+/// ```
+class PxResponsiveBuilder extends StatelessWidget {
+  /// Builder function for mobile layout.
+  /// Called when screen width < [PxResponsiveConfig.mobileBreakpoint].
+  final WidgetBuilder mobile;
+
+  /// Builder function for tablet layout.
+  /// Called when [PxResponsiveConfig.mobileBreakpoint] <= width < [PxResponsiveConfig.tabletBreakpoint].
+  final WidgetBuilder? tablet;
+
+  /// Builder function for desktop layout.
+  /// Called when screen width >= [PxResponsiveConfig.tabletBreakpoint].
+  final WidgetBuilder? desktop;
+
+  const PxResponsiveBuilder({
+    super.key,
+    required this.mobile,
+    this.tablet,
+    this.desktop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = PxResponsive();
+    if (responsive.isDesktop) {
+      return (desktop ?? tablet ?? mobile)(context);
+    }
+    if (responsive.isTablet) {
+      return (tablet ?? mobile)(context);
+    }
+    return mobile(context);
+  }
+}
+
+// ============================================================================
+// RESPONSIVE VALUE - Provide different values per device type
+// ============================================================================
+
+/// A widget that provides different values based on device type.
+///
+/// ## Basic Example
+///
+/// ```dart
+/// PxResponsiveValue<int>(
+///   mobile: 2,
+///   tablet: 3,
+///   desktop: 4,
+///   builder: (context, columnCount) {
+///     return GridView.count(
+///       crossAxisCount: columnCount,
+///       children: items,
+///     );
+///   },
+/// )
+/// ```
+class PxResponsiveValue<T> extends StatelessWidget {
+  /// Value for mobile layout.
+  final T mobile;
+
+  /// Value for tablet layout.
+  final T? tablet;
+
+  /// Value for desktop layout.
+  final T? desktop;
+
+  /// Builder function that receives the appropriate value for current device.
+  final Widget Function(BuildContext context, T value) builder;
+
+  const PxResponsiveValue({
+    super.key,
+    required this.mobile,
+    this.tablet,
+    this.desktop,
+    required this.builder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = PxResponsive();
+    T value;
+    if (responsive.isDesktop) {
+      value = desktop ?? tablet ?? mobile;
+    } else if (responsive.isTablet) {
+      value = tablet ?? mobile;
+    } else {
+      value = mobile;
+    }
+
+    return builder(context, value);
+  }
+}
+
+// ============================================================================
+// RESPONSIVE VISIBILITY - Show/hide widgets per device type
+// ============================================================================
+
+/// A widget that conditionally shows or hides its child based on device type.
+///
+/// ## Basic Example
+///
+/// ```dart
+/// PxResponsiveVisibility(
+///   visibleOnMobile: false,
+///   visibleOnTablet: true,
+///   visibleOnDesktop: true,
+///   child: const Sidebar(),
+/// )
+/// ```
+class PxResponsiveVisibility extends StatelessWidget {
+  final Widget child;
+  final bool visibleOnMobile;
+  final bool visibleOnTablet;
+  final bool visibleOnDesktop;
+  final Widget? replacement;
+  final bool maintainState;
+
+  const PxResponsiveVisibility({
+    super.key,
+    required this.child,
+    this.visibleOnMobile = true,
+    this.visibleOnTablet = true,
+    this.visibleOnDesktop = true,
+    this.replacement,
+    this.maintainState = false,
+  });
+
+  /// Creates a visibility widget that only shows on mobile.
+  const PxResponsiveVisibility.mobile({
+    super.key,
+    required this.child,
+    this.replacement,
+    this.maintainState = false,
+  })  : visibleOnMobile = true,
+        visibleOnTablet = false,
+        visibleOnDesktop = false;
+
+  /// Creates a visibility widget that only shows on tablet.
+  const PxResponsiveVisibility.tablet({
+    super.key,
+    required this.child,
+    this.replacement,
+    this.maintainState = false,
+  })  : visibleOnMobile = false,
+        visibleOnTablet = true,
+        visibleOnDesktop = false;
+
+  /// Creates a visibility widget that only shows on desktop.
+  const PxResponsiveVisibility.desktop({
+    super.key,
+    required this.child,
+    this.replacement,
+    this.maintainState = false,
+  })  : visibleOnMobile = false,
+        visibleOnTablet = false,
+        visibleOnDesktop = true;
+
+  /// Creates a visibility widget that shows on tablet and desktop (not mobile).
+  const PxResponsiveVisibility.tabletUp({
+    super.key,
+    required this.child,
+    this.replacement,
+    this.maintainState = false,
+  })  : visibleOnMobile = false,
+        visibleOnTablet = true,
+        visibleOnDesktop = true;
+
+  /// Creates a visibility widget that shows on mobile and tablet (not desktop).
+  const PxResponsiveVisibility.tabletDown({
+    super.key,
+    required this.child,
+    this.replacement,
+    this.maintainState = false,
+  })  : visibleOnMobile = true,
+        visibleOnTablet = true,
+        visibleOnDesktop = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = PxResponsive();
+    bool isVisible;
+    if (responsive.isDesktop) {
+      isVisible = visibleOnDesktop;
+    } else if (responsive.isTablet) {
+      isVisible = visibleOnTablet;
+    } else {
+      isVisible = visibleOnMobile;
+    }
+
+    if (maintainState) {
+      return Offstage(
+        offstage: !isVisible,
+        child: child,
+      );
+    }
+
+    return isVisible ? child : (replacement ?? const SizedBox.shrink());
+  }
+}
+
+
+//------------------------------------------------------------------------------
+
+// File: ./lib/src/px_responsive_config.dart
+import 'package:flutter/widgets.dart';
+
+/// Configuration class that holds the design baselines for all three device types.
+///
+/// ## Example
+///
+/// ```dart
+/// const config = PxResponsiveConfig(
+///   desktop: Size(1920, 1080),  // Your desktop design size
+///   tablet: Size(834, 1194),    // Your tablet design size
+///   mobile: Size(375, 812),     // Your mobile design size
+///   mobileBreakpoint: 600,      // Below this = mobile
+///   tabletBreakpoint: 1200,     // Above this = desktop
+/// );
+/// ```
+class PxResponsiveConfig {
+  /// Base design size for Desktop layouts.
+  final Size desktop;
+
+  /// Base design size for Tablet layouts.
+  final Size tablet;
+
+  /// Base design size for Mobile layouts.
+  final Size mobile;
+
+  /// The width threshold below which the layout is considered Mobile.
+  final double mobileBreakpoint;
+
+  /// The width threshold at or above which the layout is considered Desktop.
+  final double tabletBreakpoint;
+
+  /// Minimum scale factor to prevent elements from becoming too small.
+  final double? minScaleFactor;
+
+  /// Maximum scale factor to prevent elements from becoming too large.
+  final double? maxScaleFactor;
+
+  /// Maximum scale factor specifically for text ([sp] extension).
+  final double? maxTextScaleFactor;
+
+  /// Creates a responsive design configuration.
+  const PxResponsiveConfig({
+    this.desktop = const Size(1920, 1080),
+    this.tablet = const Size(834, 1194),
+    this.mobile = const Size(375, 812),
+    this.mobileBreakpoint = 600,
+    this.tabletBreakpoint = 1200,
+    this.minScaleFactor = 0.5,
+    this.maxScaleFactor = 2.0,
+    this.maxTextScaleFactor = 1.5,
+  })  : assert(mobileBreakpoint > 0, 'mobileBreakpoint must be positive'),
+        assert(
+          tabletBreakpoint > mobileBreakpoint,
+          'tabletBreakpoint must be greater than mobileBreakpoint',
+        ),
+        assert(
+          minScaleFactor == null || minScaleFactor > 0,
+          'minScaleFactor must be positive if provided',
+        ),
+        assert(
+          maxScaleFactor == null || maxScaleFactor > 0,
+          'maxScaleFactor must be positive if provided',
+        ),
+        assert(
+          minScaleFactor == null ||
+              maxScaleFactor == null ||
+              minScaleFactor <= maxScaleFactor,
+          'minScaleFactor must be less than or equal to maxScaleFactor',
+        );
+
+  /// Creates a copy of this config with the given fields replaced.
+  PxResponsiveConfig copyWith({
+    Size? desktop,
+    Size? tablet,
+    Size? mobile,
+    double? mobileBreakpoint,
+    double? tabletBreakpoint,
+    double? minScaleFactor,
+    double? maxScaleFactor,
+    double? maxTextScaleFactor,
+  }) {
+    return PxResponsiveConfig(
+      desktop: desktop ?? this.desktop,
+      tablet: tablet ?? this.tablet,
+      mobile: mobile ?? this.mobile,
+      mobileBreakpoint: mobileBreakpoint ?? this.mobileBreakpoint,
+      tabletBreakpoint: tabletBreakpoint ?? this.tabletBreakpoint,
+      minScaleFactor: minScaleFactor ?? this.minScaleFactor,
+      maxScaleFactor: maxScaleFactor ?? this.maxScaleFactor,
+      maxTextScaleFactor: maxTextScaleFactor ?? this.maxTextScaleFactor,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+
+    return other is PxResponsiveConfig &&
+        other.desktop == desktop &&
+        other.tablet == tablet &&
+        other.mobile == mobile &&
+        other.mobileBreakpoint == mobileBreakpoint &&
+        other.tabletBreakpoint == tabletBreakpoint &&
+        other.minScaleFactor == minScaleFactor &&
+        other.maxScaleFactor == maxScaleFactor &&
+        other.maxTextScaleFactor == maxTextScaleFactor;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(
+      desktop,
+      tablet,
+      mobile,
+      mobileBreakpoint,
+      tabletBreakpoint,
+      minScaleFactor,
+      maxScaleFactor,
+      maxTextScaleFactor,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'PxResponsiveConfig('
+        'desktop: $desktop, '
+        'tablet: $tablet, '
+        'mobile: $mobile, '
+        'mobileBreakpoint: $mobileBreakpoint, '
+        'tabletBreakpoint: $tabletBreakpoint, '
+        'minScaleFactor: $minScaleFactor, '
+        'maxScaleFactor: $maxScaleFactor, '
+        'maxTextScaleFactor: $maxTextScaleFactor)';
+  }
+}
+
+/// Enum representing the current device type based on screen width.
+///
+/// Use with [deviceType] global getter or [PxResponsive.deviceType]:
+///
+/// ```dart
+/// switch (deviceType) {
+///   case PxDeviceType.mobile:
+///     return MobileLayout();
+///   case PxDeviceType.tablet:
+///     return TabletLayout();
+///   case PxDeviceType.desktop:
+///     return DesktopLayout();
+/// }
+/// ```
+enum PxDeviceType {
+  /// Mobile device (screen width < mobileBreakpoint).
+  mobile,
+
+  /// Tablet device (mobileBreakpoint <= screen width < tabletBreakpoint).
+  tablet,
+
+  /// Desktop device (screen width >= tabletBreakpoint).
+  desktop,
+}
+
+
+//------------------------------------------------------------------------------
+
+// File: ./lib/src/px_responsive_core.dart
+import 'dart:math' as math;
+import 'package:flutter/widgets.dart';
+import 'px_responsive_config.dart';
+
+/// The singleton core that calculates and provides scaling factors.
+///
+/// ## Usage
+///
+/// ```dart
+/// // Simple way (recommended)
+/// if (isMobile) { ... }
+/// width: 200.w
+///
+/// // Direct singleton access (when needed)
+/// final responsive = PxResponsive();
+/// double scaledWidth = 200 * responsive.scaleW;
+/// ```
+class PxResponsive {
+  // ============== Singleton Pattern ==============
+
+  static final PxResponsive _instance = PxResponsive._internal();
+
+  /// Returns the singleton instance of [PxResponsive].
+  factory PxResponsive() => _instance;
+
+  PxResponsive._internal();
+
+  // ============== Private Fields ==============
+
+  /// The configuration provided by the user via [PxResponsiveWrapper].
+  PxResponsiveConfig _config = const PxResponsiveConfig();
+
+  /// Current screen width in logical pixels.
+  double _screenWidth = 0;
+
+  /// Current screen height in logical pixels.
+  double _screenHeight = 0;
+
+  /// The device pixel ratio (dpr) of the current screen.
+  double _devicePixelRatio = 1.0;
+
+  /// The active base size (Mobile, Tablet, or Desktop) chosen based on current width.
+  Size _activeBaseSize = const Size(375, 812);
+
+  /// Whether the singleton has been properly initialized.
+  bool _isInitialized = false;
+
+  // ============== Configuration Getters ==============
+
+  /// The current configuration.
+  PxResponsiveConfig get config => _config;
+
+  /// Returns `true` if the singleton has been properly initialized.
+  bool get isInitialized => _isInitialized;
+
+  // ============== Screen Dimension Getters ==============
+
+  double get screenWidth => _screenWidth;
+  double get screenHeight => _screenHeight;
+  double get devicePixelRatio => _devicePixelRatio;
+
+  /// The active base design size based on current screen width.
+  Size get activeBaseSize => _activeBaseSize;
+
+  // ============== Device Type Getters ==============
+
+  /// The current device type as [PxDeviceType] enum.
+  PxDeviceType get deviceType {
+    if (isMobile) return PxDeviceType.mobile;
+    if (isTablet) return PxDeviceType.tablet;
+    return PxDeviceType.desktop;
+  }
+
+  /// Returns `true` if the current screen width is in the mobile range.
+  bool get isMobile => _screenWidth < _config.mobileBreakpoint;
+
+  /// Returns `true` if the current screen width is in the tablet range.
+  bool get isTablet =>
+      _screenWidth >= _config.mobileBreakpoint &&
+      _screenWidth < _config.tabletBreakpoint;
+
+  /// Returns `true` if the current screen width is in the desktop range.
+  bool get isDesktop => _screenWidth >= _config.tabletBreakpoint;
+
+  // ============== Scale Factor Getters ==============
+
+  /// Raw (unclamped) scale factor for width.
+  double get rawScaleW {
+    final baseWidth = _activeBaseSize.width;
+    return baseWidth > 0 ? _screenWidth / baseWidth : 1.0;
+  }
+
+  /// Raw (unclamped) scale factor for height.
+  double get rawScaleH {
+    final baseHeight = _activeBaseSize.height;
+    return baseHeight > 0 ? _screenHeight / baseHeight : 1.0;
+  }
+
+  /// Clamped scale factor for width.
+  double get scaleW => _clampScale(rawScaleW);
+
+  /// Clamped scale factor for height.
+  double get scaleH => _clampScale(rawScaleH);
+
+  /// Clamped scale factor for fonts (scalable pixels).
+  double get scaleSp => _clampTextScale(rawScaleW);
+
+  /// Clamped scale factor for radius/diagonal elements.
+  double get scaleR => _clampScale(math.min(rawScaleW, rawScaleH));
+
+  // ============== Private Utility Methods ==============
+
+  double _clampScale(double scale) {
+    double result = scale;
+    if (_config.minScaleFactor != null) {
+      result = math.max(result, _config.minScaleFactor!);
+    }
+    if (_config.maxScaleFactor != null) {
+      result = math.min(result, _config.maxScaleFactor!);
+    }
+    return result;
+  }
+
+  double _clampTextScale(double scale) {
+    double result = scale;
+    if (_config.minScaleFactor != null) {
+      result = math.max(result, _config.minScaleFactor!);
+    }
+    final double maxText =
+        _config.maxTextScaleFactor ?? _config.maxScaleFactor ?? double.infinity;
+    result = math.min(result, maxText);
+    return result;
+  }
+
+  // ============== Public Scaling Methods ==============
+
+  double w(num value) => value * scaleW;
+  double h(num value) => value * scaleH;
+  double sp(num value) => value * scaleSp;
+  double r(num value) => value * scaleR;
+
+  /// Returns the appropriate value based on the current device type.
+  T value<T>({
+    required T mobile,
+    T? tablet,
+    T? desktop,
+  }) {
+    if (isDesktop) return desktop ?? tablet ?? mobile;
+    if (isTablet) return tablet ?? mobile;
+    return mobile;
+  }
+
+  // ============== Internal Methods ==============
+
+  /// Internal initialization method called by [PxResponsiveWrapper].
+  void init({
+    required BoxConstraints constraints,
+    required PxResponsiveConfig config,
+    double devicePixelRatio = 1.0,
+  }) {
+    _config = config;
+    _screenWidth = constraints.maxWidth;
+    _screenHeight = constraints.maxHeight;
+    _devicePixelRatio = devicePixelRatio;
+    _isInitialized = true;
+
+    // Determine active base size based on current width
+    if (isMobile) {
+      _activeBaseSize = _config.mobile;
+    } else if (isTablet) {
+      _activeBaseSize = _config.tablet;
+    } else {
+      _activeBaseSize = _config.desktop;
+    }
+  }
+
+  /// Resets the singleton to its initial state.
+  void reset() {
+    _config = const PxResponsiveConfig();
+    _screenWidth = 0;
+    _screenHeight = 0;
+    _devicePixelRatio = 1.0;
+    _activeBaseSize = const Size(375, 812);
+    _isInitialized = false;
+  }
+
+  @override
+  String toString() {
+    return 'PxResponsive('
+        'isInitialized: $_isInitialized, '
+        'screenWidth: ${_screenWidth.toStringAsFixed(1)}, '
+        'screenHeight: ${_screenHeight.toStringAsFixed(1)}, '
+        'deviceType: $deviceType, '
+        'activeBaseSize: $_activeBaseSize, '
+        'scaleW: ${scaleW.toStringAsFixed(3)}, '
+        'scaleH: ${scaleH.toStringAsFixed(3)}, '
+        'scaleSp: ${scaleSp.toStringAsFixed(3)}, '
+        'scaleR: ${scaleR.toStringAsFixed(3)})';
+  }
+}
+
+
+//------------------------------------------------------------------------------
+
+// File: ./lib/src/px_responsive_extensions.dart
+import 'dart:math' as math;
+import 'package:flutter/widgets.dart';
+import 'px_responsive_config.dart';
+import 'px_responsive_core.dart';
+
+// ============================================================================
+// GLOBAL GETTERS - Simple access to device type without PxResponsive()
+// ============================================================================
+
+/// Returns `true` if the current screen width is in the mobile range.
+bool get isMobile => PxResponsive().isMobile;
+
+/// Returns `true` if the current screen width is in the tablet range.
+bool get isTablet => PxResponsive().isTablet;
+
+/// Returns `true` if the current screen width is in the desktop range.
+bool get isDesktop => PxResponsive().isDesktop;
+
+/// Returns the current device type as [PxDeviceType] enum.
+PxDeviceType get deviceType => PxResponsive().deviceType;
+
+/// Returns the current screen width in logical pixels.
+double get screenWidth => PxResponsive().screenWidth;
+
+/// Returns the current screen height in logical pixels.
+double get screenHeight => PxResponsive().screenHeight;
+
+// ============================================================================
+// GLOBAL FUNCTIONS
+// ============================================================================
+
+/// Returns the appropriate value based on current device type.
+T responsiveValue<T>({
+  required T mobile,
+  T? tablet,
+  T? desktop,
+}) {
+  return PxResponsive().value(
+    mobile: mobile,
+    tablet: tablet,
+    desktop: desktop,
+  );
+}
+
+// ============================================================================
+// NUM EXTENSIONS - Core responsive scaling
+// ============================================================================
+
+/// Extensions on [num] for responsive scaling.
+extension PxResponsiveNumExtension on num {
+  // ==================== Core Scaling ====================
+
+  /// Scales this value based on width ratio.
+  double get w => this * PxResponsive().scaleW;
+
+  /// Scales this value based on height ratio.
+  double get h => this * PxResponsive().scaleH;
+
+  /// Scales this value for fonts (Scalable Pixels).
+  double get sp => this * PxResponsive().scaleSp;
+
+  /// Scales this value for radius/diagonal elements.
+  double get r => this * PxResponsive().scaleR;
+
+  // ==================== Percentage of Screen ====================
+
+  /// Returns this value as a percentage of the full window width.
+  double get wf => (this / 100) * PxResponsive().screenWidth;
+
+  /// Returns this value as a percentage of the full window height.
+  double get hf => (this / 100) * PxResponsive().screenHeight;
+
+  // ==================== Clamping Methods ====================
+
+  /// Returns this value scaled by width with a custom minimum.
+  double wMin(double minimum) => math.max(w, minimum);
+
+  /// Returns this value scaled by width with a custom maximum.
+  double wMax(double maximum) => math.min(w, maximum);
+
+  /// Returns this value scaled by width, clamped between min and max.
+  double wClamp(double minimum, double maximum) => w.clamp(minimum, maximum);
+
+  /// Returns this value scaled by height with a custom minimum.
+  double hMin(double minimum) => math.max(h, minimum);
+
+  /// Returns this value scaled by height with a custom maximum.
+  double hMax(double maximum) => math.min(h, maximum);
+
+  /// Returns this value scaled by height, clamped between min and max.
+  double hClamp(double minimum, double maximum) => h.clamp(minimum, maximum);
+
+  /// Returns this value scaled for fonts with a custom minimum.
+  double spMin(double minimum) => math.max(sp, minimum);
+
+  /// Returns this value scaled for fonts with a custom maximum.
+  double spMax(double maximum) => math.min(sp, maximum);
+
+  /// Returns this value scaled for fonts, clamped between min and max.
+  double spClamp(double minimum, double maximum) => sp.clamp(minimum, maximum);
+}
+
+// ============================================================================
+// PARENT-RELATIVE SIZING
+// ============================================================================
+
+/// A widget that provides parent-relative sizing for its child.
+///
+/// Wrap a parent widget with [PxRelativeSizeProvider] to enable the
+/// `.wr()` and `.hr()` extensions.
+class PxRelativeSizeProvider extends StatelessWidget {
+  /// The child widget that will have access to relative sizing.
+  final Widget child;
+
+  /// Creates a relative size provider.
+  const PxRelativeSizeProvider({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return _PxRelativeSizeInherited(
+          parentSize: Size(constraints.maxWidth, constraints.maxHeight),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+/// Internal inherited widget to pass parent size down the tree.
+class _PxRelativeSizeInherited extends InheritedWidget {
+  final Size parentSize;
+
+  const _PxRelativeSizeInherited({
+    required this.parentSize,
+    required super.child,
+  });
+
+  static Size? of(BuildContext context) {
+    final inherited =
+        context.dependOnInheritedWidgetOfExactType<_PxRelativeSizeInherited>();
+    return inherited?.parentSize;
+  }
+
+  @override
+  bool updateShouldNotify(_PxRelativeSizeInherited oldWidget) {
+    return parentSize != oldWidget.parentSize;
+  }
+}
+
+/// Extensions on [num] for parent-relative sizing.
+extension PxResponsiveRelativeExtension on num {
+  /// Returns this value as a percentage of the parent's width.
+  /// Requires the parent to be wrapped with [PxRelativeSizeProvider].
+  double wr(BuildContext context) {
+    final parentSize = _PxRelativeSizeInherited.of(context);
+    if (parentSize != null) {
+      return (this / 100) * parentSize.width;
+    }
+    // Fallback: use screen width
+    return (this / 100) * PxResponsive().screenWidth;
+  }
+
+  /// Returns this value as a percentage of the parent's height.
+  /// Requires the parent to be wrapped with [PxRelativeSizeProvider].
+  double hr(BuildContext context) {
+    final parentSize = _PxRelativeSizeInherited.of(context);
+    if (parentSize != null) {
+      return (this / 100) * parentSize.height;
+    }
+    // Fallback: use screen height
+    return (this / 100) * PxResponsive().screenHeight;
+  }
+}
+
+// ============================================================================
+// EDGEINSETS EXTENSIONS
+// ============================================================================
+
+/// Extensions on [EdgeInsets] for responsive scaling.
+extension PxResponsiveEdgeInsetsExtension on EdgeInsets {
+  /// Returns a new [EdgeInsets] with all values scaled by width factor.
+  EdgeInsets get w => copyWith(
+        left: left * PxResponsive().scaleW,
+        top: top * PxResponsive().scaleW,
+        right: right * PxResponsive().scaleW,
+        bottom: bottom * PxResponsive().scaleW,
+      );
+
+  /// Returns a new [EdgeInsets] with horizontal scaled by width, vertical by height.
+  EdgeInsets get scaled => copyWith(
+        left: left * PxResponsive().scaleW,
+        top: top * PxResponsive().scaleH,
+        right: right * PxResponsive().scaleW,
+        bottom: bottom * PxResponsive().scaleH,
+      );
+
+  /// Returns a new [EdgeInsets] with all values scaled by radius factor.
+  EdgeInsets get r => copyWith(
+        left: left * PxResponsive().scaleR,
+        top: top * PxResponsive().scaleR,
+        right: right * PxResponsive().scaleR,
+        bottom: bottom * PxResponsive().scaleR,
+      );
+}
+
+// ============================================================================
+// SIZE EXTENSIONS
+// ============================================================================
+
+/// Extensions on [Size] for responsive scaling.
+extension PxResponsiveSizeExtension on Size {
+  /// Returns a new [Size] with width scaled by scaleW and height by scaleH.
+  Size get scaled => Size(
+        width * PxResponsive().scaleW,
+        height * PxResponsive().scaleH,
+      );
+
+  /// Returns a new [Size] with both dimensions scaled by scaleW.
+  Size get w => Size(
+        width * PxResponsive().scaleW,
+        height * PxResponsive().scaleW,
+      );
+
+  /// Returns a new [Size] with both dimensions scaled by scaleR.
+  Size get r => Size(
+        width * PxResponsive().scaleR,
+        height * PxResponsive().scaleR,
+      );
+}
+
+// ============================================================================
+// BORDERRADIUS EXTENSIONS
+// ============================================================================
+
+/// Extensions on [BorderRadius] for responsive scaling.
+extension PxResponsiveBorderRadiusExtension on BorderRadius {
+  /// Returns a new [BorderRadius] with all radii scaled by scaleR.
+  BorderRadius get r {
+    final scale = PxResponsive().scaleR;
+    return copyWith(
+      topLeft: Radius.elliptical(
+        topLeft.x * scale,
+        topLeft.y * scale,
+      ),
+      topRight: Radius.elliptical(
+        topRight.x * scale,
+        topRight.y * scale,
+      ),
+      bottomLeft: Radius.elliptical(
+        bottomLeft.x * scale,
+        bottomLeft.y * scale,
+      ),
+      bottomRight: Radius.elliptical(
+        bottomRight.x * scale,
+        bottomRight.y * scale,
+      ),
+    );
+  }
+}
+
+
+//------------------------------------------------------------------------------
+
+// File: ./lib/src/px_responsive_wrapper.dart
+import 'package:flutter/widgets.dart';
+import 'px_responsive_config.dart';
+import 'px_responsive_core.dart';
+
+// ============================================================================
+// MAIN WRAPPER - Use this at the root of your app
+// ============================================================================
+
+/// A wrapper widget that initializes the responsive scaling system.
+///
+/// ## Basic Usage
+///
+/// ```dart
+/// void main() {
+///   runApp(
+///     PxResponsiveWrapper(
+///       config: const PxResponsiveConfig(
+///         desktop: Size(1920, 1080),
+///         tablet: Size(834, 1194),
+///         mobile: Size(375, 812),
+///       ),
+///       child: const MyApp(),
+///     ),
+///   );
+/// }
+/// ```
+class PxResponsiveWrapper extends StatelessWidget {
+  /// The child widget to render.
+  final Widget? child;
+
+  /// A builder function that provides access to the [PxResponsive] instance.
+  final Widget Function(BuildContext context, PxResponsive responsive)? builder;
+
+  /// Configuration for the responsive system.
+  final PxResponsiveConfig config;
+
+  /// Creates a responsive wrapper.
+  const PxResponsiveWrapper({
+    super.key,
+    this.child,
+    this.builder,
+    this.config = const PxResponsiveConfig(),
+  }) : assert(
+          child != null || builder != null,
+          'Either child or builder must be provided',
+        );
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        double devicePixelRatio = 1.0;
+        final mediaQuery = MediaQuery.maybeOf(context);
+        if (mediaQuery != null) {
+          devicePixelRatio = mediaQuery.devicePixelRatio;
+        }
+
+        PxResponsive().init(
+          constraints: constraints,
+          config: config,
+          devicePixelRatio: devicePixelRatio,
+        );
+
+        if (builder != null) {
+          return builder!(context, PxResponsive());
+        }
+        return child!;
+      },
+    );
+  }
+}
+
+
+//------------------------------------------------------------------------------
+
+// File: ./pubspec.yaml
+name: px_responsive
+description: A powerful tri-tier responsive design system for Flutter. Automatically scales UI elements across mobile, tablet, and desktop based on your Figma/XD design specifications.
+version: 0.0.1
+homepage: https://github.com/IbrahimElmourchidi/fl_responsive
+repository: https://github.com/IbrahimElmourchidi/fl_responsive
+issue_tracker: https://github.com/IbrahimElmourchidi/fl_responsive/issues
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+platforms:
+  android:
+  ios:
+  web:
+
+
+//------------------------------------------------------------------------------
+
+// File: ./README.md
+# px_responsive
+
+[![pub package](https://img.shields.io/pub/v/px_responsive.svg)](https://pub.dev/packages/px_responsive)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+A powerful tri-tier responsive design system for Flutter. Automatically scales UI elements across **mobile**, **tablet**, and **desktop** based on your Figma/XD design specifications.
+
+## ✨ Features
+
+- 🎯 **Design-Driven Scaling**: Match your Figma/XD artboard sizes exactly
+- 📱 **Tri-Tier Support**: Separate base designs for mobile, tablet, and desktop
+- 🔄 **Automatic Switching**: Seamlessly transitions between design bases at breakpoints
+- 🛡️ **Safety Clamping**: Prevents UI from breaking on extreme screen sizes
+- 📝 **Simple API**: Just use `.w`, `.h`, `.sp`, `.r` extensions
+- 📐 **Percentage Sizing**: `.wf`, `.hf` for window percentage, `.wr()`, `.hr()` for parent percentage
+- 🏗️ **Builder Widgets**: Create completely different layouts per device type
+
+## 📦 Installation
+
+```yaml
+dependencies:
+  px_responsive: ^0.0.1
+
+```
+
+## 🚀 Getting Started
+
+### 1. Wrap Your App
+
+```dart
+import 'package:px_responsive/px_responsive.dart';
+
+void main() {
+  runApp(
+    PxResponsiveWrapper(
+      config: const PxResponsiveConfig(
+        desktop: Size(1920, 1080),  // Your Figma desktop size
+        tablet: Size(834, 1194),    // Your Figma tablet size
+        mobile: Size(375, 812),     // Your Figma mobile size
+      ),
+      child: const MyApp(),
+    ),
+  );
+}
+
+```
+
+### 2. Use the Extensions
+
+```dart
+Container(
+  width: 200.w,   // Scaled width
+  height: 100.h,  // Scaled height
+  child: Text(
+    'Hello',
+    style: TextStyle(fontSize: 16.sp),
+  ),
+)
+
+```
+
+## 📐 Extension Reference
+
+| Extension | Description |
+| --- | --- |
+| `.w` | Width scaled by design ratio |
+| `.h` | Height scaled by design ratio |
+| `.sp` | Font size (with tighter max) |
+| `.r` | Radius using min(scaleW, scaleH) |
+| `.wf` | Percentage of window width |
+| `.hf` | Percentage of window height |
+| `.wr(context)` | Percentage of parent width |
+| `.hr(context)` | Percentage of parent height |
+
+## 🎯 responsiveValue() - Different Values Per Device
+
+Instead of verbose ternary operators:
+
+```dart
+// ❌ Old way
+width: responsive.isDesktop ? 200.w : responsive.isTablet ? 160.w : 120.w
+
+// ✅ New way
+width: responsiveValue(mobile: 120.w, tablet: 160.w, desktop: 200.w)
+
+```
+
+Works with any type:
+
+```dart
+// Different colors per device
+color: responsiveValue(
+  mobile: Colors.red,
+  tablet: Colors.orange,
+  desktop: Colors.green,
+)
+
+// Optional fallbacks (tablet uses mobile if not specified)
+padding: responsiveValue(mobile: 16.w, desktop: 32.w)
+
+```
+
+## 📐 Percentage Sizing
+
+### Window Percentage (`.wf`, `.hf`)
+
+```dart
+Container(
+  width: 50.wf,   // 50% of screen width
+  height: 25.hf,  // 25% of screen height
+)
+
+```
+
+### Parent Percentage (`.wr()`, `.hr()`)
+
+Requires `PXReselativeSizeProvider` wrapper:
+
+```dart
+Container(
+  width: 400,
+  height: 300,
+  child: PXReselativeSizeProvider(
+    child: Builder(
+      builder: (context) => Container(
+        width: 50.wr(context),  // 200px (50% of 400)
+        height: 25.hr(context), // 75px (25% of 300)
+      ),
+    ),
+  ),
+)
+
+```
+
+## 🏗️ Responsive Builders
+
+### Different Layouts Per Device
+
+```dart
+PxResponsiveBuilder(
+  mobile: (context) => MobileLayout(),
+  tablet: (context) => TabletLayout(),
+  desktop: (context) => DesktopLayout(),
+)
+
+```
+
+### Responsive Values Widget
+
+```dart
+PxResponsiveValue<int>(
+  mobile: 2,
+  tablet: 3,
+  desktop: 4,
+  builder: (context, columnCount) {
+    return GridView.count(crossAxisCount: columnCount);
+  },
+)
+
+```
+
+### Conditional Visibility
+
+```dart
+PxResponsiveVisibility.desktop(child: SideBar())
+PxResponsiveVisibility.tabletUp(child: ExtendedMenu())
+PxResponsiveVisibility.mobile(child: BottomNav())
+
+```
+
+## ⚙️ Configuration
+
+```dart
+PxResponsiveConfig(
+  // Base design sizes
+  desktop: Size(1920, 1080),
+  tablet: Size(834, 1194),
+  mobile: Size(375, 812),
+  
+  // Breakpoints
+  mobileBreakpoint: 600,
+  tabletBreakpoint: 1200,
+  
+  // Safety limits
+  minScaleFactor: 0.5,
+  maxScaleFactor: 2.0,
+  maxTextScaleFactor: 1.5,
+)
+
+```
+
+## 🔍 Device Type Checking
+
+Simple global getters - no need to access `PxResponsive()`:
+
+```dart
+// Boolean checks
+if (isMobile) {
+  // Mobile-specific code
+}
+
+if (isTablet) {
+  // Tablet-specific code
+}
+
+if (isDesktop) {
+  // Desktop-specific code
+}
+
+// Enum for switch statements
+switch (deviceType) {
+  case EasyDeviceType.mobile:
+    return MobileLayout();
+  case EasyDeviceType.tablet:
+    return TabletLayout();
+  case EasyDeviceType.desktop:
+    return DesktopLayout();
+}
+
+// Screen dimensions
+print('Width: $screenWidth, Height: $screenHeight');
+
+```
+
+## 🔍 Full Access (Optional)
+
+For more details, access the singleton:
+
+```dart
+final responsive = PxResponsive();
+
+responsive.scaleW          // Width scale factor
+responsive.scaleH          // Height scale factor
+responsive.activeBaseSize  // Current base design size
+responsive.devicePixelRatio
+
+```
+
+## 📊 How It Works
+
+```
+Your Design (Figma/XD)          Current Screen
+┌─────────────────┐             ┌─────────────────┐
+│ Mobile: 375x812 │             │ Screen: 390x844 │
+│ Tablet: 834x1194│  ──────►    │                 │
+│ Desktop:1920x1080             │ Scale: 1.04     │
+└─────────────────┘             └─────────────────┘
+
+200.w = 200 * (390/375) = 208px
+
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
+
+## 🤝 About the Author
+
+<div align="center">
+<a href="https://github.com/IbrahimElmourchidi">
+<img src="https://github.com/IbrahimElmourchidi.png" width="80" alt="Ibrahim El Mourchidi" style="border-radius: 50%;">
+</a>
+<h3>Ibrahim El Mourchidi</h3>
+<p>Flutter & Firebase Developer • Cairo, Egypt</p>
+<p>
+<a href="https://github.com/IbrahimElmourchidi">
+<img src="https://img.shields.io/github/followers/IbrahimElmourchidi?label=Follow&style=social" alt="GitHub Follow">
+</a>
+<a href="mailto:ibrahimelmourchidi@gmail.com">
+<img src="https://img.shields.io/badge/Email-D14836?logo=gmail&logoColor=white" alt="Email">
+</a>
+<a href="https://www.linkedin.com/in/IbrahimElmourchidi">
+<img src="https://img.shields.io/badge/LinkedIn-Profile-blue?style=flat&logo=linkedin" alt="LinkedIn Profile">
+</a>
+</p>
+</div>
+
+---
+
+👥 Contributors
+We appreciate all contributions to this project! 
+
+
+
+
+
+
+<a href="https://www.google.com/search?q=https://github.com/IbrahimElmourchidi/px_responsive/graphs/contributors">
+<img src="https://www.google.com/search?q=https://contrib.rocks/image%3Frepo%3DIbrahimElmourchidi/px_responsive" />
+</a>
+
+```
+
+//------------------------------------------------------------------------------
+
+// File: ./test/px_responsive_test.dart
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:px_responsive/px_responsive.dart';
+
+void main() {
+  setUp(() {
+    PxResponsive().reset();
+  });
+
+  group('PxResponsiveConfig', () {
+    test('default values are correct', () {
+      const config = PxResponsiveConfig();
+      expect(config.desktop, const Size(1920, 1080));
+      expect(config.tablet, const Size(834, 1194));
+      expect(config.mobile, const Size(375, 812));
+      expect(config.mobileBreakpoint, 600);
+      expect(config.tabletBreakpoint, 1200);
+    });
+
+    test('copyWith works correctly', () {
+      const config = PxResponsiveConfig();
+      final newConfig = config.copyWith(mobileBreakpoint: 500);
+      expect(newConfig.mobileBreakpoint, 500);
+      expect(newConfig.tabletBreakpoint, 1200);
+    });
+  });
+
+  group('PxResponsive', () {
+    test('singleton returns same instance', () {
+      final instance1 = PxResponsive();
+      final instance2 = PxResponsive();
+      expect(identical(instance1, instance2), true);
+    });
+
+    test('init sets values correctly for mobile', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 375, maxHeight: 812),
+        config: const PxResponsiveConfig(),
+      );
+
+      expect(PxResponsive().screenWidth, 375);
+      expect(PxResponsive().screenHeight, 812);
+      expect(PxResponsive().isMobile, true);
+      expect(PxResponsive().isTablet, false);
+      expect(PxResponsive().isDesktop, false);
+      expect(PxResponsive().deviceType, PxDeviceType.mobile);
+    });
+
+    test('init sets values correctly for tablet', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 834, maxHeight: 1194),
+        config: const PxResponsiveConfig(),
+      );
+
+      expect(PxResponsive().isMobile, false);
+      expect(PxResponsive().isTablet, true);
+      expect(PxResponsive().isDesktop, false);
+      expect(PxResponsive().deviceType, PxDeviceType.tablet);
+    });
+
+    test('init sets values correctly for desktop', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 1920, maxHeight: 1080),
+        config: const PxResponsiveConfig(),
+      );
+
+      expect(PxResponsive().isMobile, false);
+      expect(PxResponsive().isTablet, false);
+      expect(PxResponsive().isDesktop, true);
+      expect(PxResponsive().deviceType, PxDeviceType.desktop);
+    });
+
+    test('scale factors are calculated correctly', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 375, maxHeight: 812),
+        config: const PxResponsiveConfig(),
+      );
+
+      expect(PxResponsive().scaleW, 1.0);
+      expect(PxResponsive().scaleH, 1.0);
+    });
+
+    test('value method returns correct value per device', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 375, maxHeight: 812),
+        config: const PxResponsiveConfig(),
+      );
+
+      final result = PxResponsive().value(
+        mobile: 'mobile',
+        tablet: 'tablet',
+        desktop: 'desktop',
+      );
+      expect(result, 'mobile');
+    });
+
+    test('value method falls back correctly', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 834, maxHeight: 1194),
+        config: const PxResponsiveConfig(),
+      );
+
+      final result = PxResponsive().value(
+        mobile: 'mobile',
+        desktop: 'desktop',
+      );
+      expect(result, 'mobile'); // tablet falls back to mobile
+    });
+  });
+
+  group('Extensions', () {
+    setUp(() {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 375, maxHeight: 812),
+        config: const PxResponsiveConfig(),
+      );
+    });
+
+    test('.w extension scales correctly', () {
+      expect(100.w, 100 * PxResponsive().scaleW);
+    });
+
+    test('.h extension scales correctly', () {
+      expect(100.h, 100 * PxResponsive().scaleH);
+    });
+
+    test('.sp extension scales correctly', () {
+      expect(16.sp, 16 * PxResponsive().scaleSp);
+    });
+
+    test('.r extension scales correctly', () {
+      expect(12.r, 12 * PxResponsive().scaleR);
+    });
+
+    test('.wf extension calculates percentage correctly', () {
+      expect(50.wf, 0.5 * PxResponsive().screenWidth);
+    });
+
+    test('.hf extension calculates percentage correctly', () {
+      expect(50.hf, 0.5 * PxResponsive().screenHeight);
+    });
+
+    test('clamping methods work correctly', () {
+      expect(100.wMin(150), 150);
+      expect(100.wMax(50), 50);
+      expect(100.wClamp(80, 120), closeTo(100, 1));
+    });
+  });
+
+  group('responsiveValue', () {
+    test('returns mobile value on mobile', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 375, maxHeight: 812),
+        config: const PxResponsiveConfig(),
+      );
+
+      final result = responsiveValue(
+        mobile: 100,
+        tablet: 200,
+        desktop: 300,
+      );
+      expect(result, 100);
+    });
+
+    test('returns tablet value on tablet', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 834, maxHeight: 1194),
+        config: const PxResponsiveConfig(),
+      );
+
+      final result = responsiveValue(
+        mobile: 100,
+        tablet: 200,
+        desktop: 300,
+      );
+      expect(result, 200);
+    });
+
+    test('returns desktop value on desktop', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 1920, maxHeight: 1080),
+        config: const PxResponsiveConfig(),
+      );
+
+      final result = responsiveValue(
+        mobile: 100,
+        tablet: 200,
+        desktop: 300,
+      );
+      expect(result, 300);
+    });
+  });
+
+  group('Global getters', () {
+    test('isMobile getter works', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 375, maxHeight: 812),
+        config: const PxResponsiveConfig(),
+      );
+      expect(isMobile, true);
+    });
+
+    test('isTablet getter works', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 834, maxHeight: 1194),
+        config: const PxResponsiveConfig(),
+      );
+      expect(isTablet, true);
+    });
+
+    test('isDesktop getter works', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 1920, maxHeight: 1080),
+        config: const PxResponsiveConfig(),
+      );
+      expect(isDesktop, true);
+    });
+
+    test('screenWidth and screenHeight getters work', () {
+      PxResponsive().init(
+        constraints: const BoxConstraints(maxWidth: 375, maxHeight: 812),
+        config: const PxResponsiveConfig(),
+      );
+      expect(screenWidth, 375);
+      expect(screenHeight, 812);
+    });
+  });
+}
+
+
+//------------------------------------------------------------------------------
+
