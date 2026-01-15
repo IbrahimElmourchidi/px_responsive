@@ -15,6 +15,7 @@
 ///         desktop: Size(1920, 1080),
 ///         tablet: Size(834, 1194),
 ///         mobile: Size(375, 812),
+///         maxWidth: 1920, // Optional: cap scaling at 1920px
 ///       ),
 ///       child: const MyApp(),
 ///     ),
@@ -72,6 +73,12 @@
 /// | [deviceType] | `PxDeviceType` | Current device type enum |
 /// | [screenWidth] | `double` | Current screen width |
 /// | [screenHeight] | `double` | Current screen height |
+///
+/// ## WebAssembly (WASM) Support
+///
+/// This package is fully compatible with Flutter's WASM compilation target.
+/// It uses only pure Dart code and Flutter widgets without any platform-specific
+/// dependencies, making it suitable for web applications compiled to WASM.
 library;
 
 export 'src/px_responsive_config.dart';

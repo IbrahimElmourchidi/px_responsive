@@ -20,6 +20,18 @@ import 'px_responsive_core.dart';
 ///   desktop: (context) => const DesktopLayout(),
 /// )
 /// ```
+///
+/// ## With maxWidth Example
+///
+/// ```dart
+/// // Even on ultra-wide screens, the desktop layout will use
+/// // the maxWidth for scaling calculations
+/// PxResponsiveBuilder(
+///   mobile: (context) => ListView(children: mobileItems),
+///   tablet: (context) => GridView.count(crossAxisCount: 2, children: items),
+///   desktop: (context) => GridView.count(crossAxisCount: 4, children: items),
+/// )
+/// ```
 class PxResponsiveBuilder extends StatelessWidget {
   /// Builder function for mobile layout.
   /// Called when screen width < [PxResponsiveConfig.mobileBreakpoint].
@@ -33,6 +45,11 @@ class PxResponsiveBuilder extends StatelessWidget {
   /// Called when screen width >= [PxResponsiveConfig.tabletBreakpoint].
   final WidgetBuilder? desktop;
 
+  /// Creates a responsive builder widget.
+  ///
+  /// The [mobile] builder is required and serves as the fallback.
+  /// If [tablet] is null, [mobile] will be used for tablet screens.
+  /// If [desktop] is null, [tablet] or [mobile] will be used for desktop screens.
   const PxResponsiveBuilder({
     super.key,
     required this.mobile,
@@ -74,6 +91,22 @@ class PxResponsiveBuilder extends StatelessWidget {
 ///   },
 /// )
 /// ```
+///
+/// ## With Styling Example
+///
+/// ```dart
+/// PxResponsiveValue<double>(
+///   mobile: 16,
+///   tablet: 20,
+///   desktop: 24,
+///   builder: (context, fontSize) {
+///     return Text(
+///       'Responsive Text',
+///       style: TextStyle(fontSize: fontSize.sp),
+///     );
+///   },
+/// )
+/// ```
 class PxResponsiveValue<T> extends StatelessWidget {
   /// Value for mobile layout.
   final T mobile;
@@ -87,6 +120,11 @@ class PxResponsiveValue<T> extends StatelessWidget {
   /// Builder function that receives the appropriate value for current device.
   final Widget Function(BuildContext context, T value) builder;
 
+  /// Creates a responsive value widget.
+  ///
+  /// The [mobile] value is required and serves as the fallback.
+  /// If [tablet] is null, [mobile] will be used for tablet screens.
+  /// If [desktop] is null, [tablet] or [mobile] will be used for desktop screens.
   const PxResponsiveValue({
     super.key,
     required this.mobile,
@@ -127,14 +165,49 @@ class PxResponsiveValue<T> extends StatelessWidget {
 ///   child: const Sidebar(),
 /// )
 /// ```
+///
+/// ## Named Constructor Examples
+///
+/// ```dart
+/// // Show only on mobile
+/// PxResponsiveVisibility.mobile(
+///   child: const MobileMenu(),
+/// )
+///
+/// // Show on tablet and above
+/// PxResponsiveVisibility.tabletUp(
+///   child: const DesktopMenu(),
+/// )
+///
+/// // Show with replacement when hidden
+/// PxResponsiveVisibility.desktop(
+///   child: const FullSidebar(),
+///   replacement: const CollapsedSidebar(),
+/// )
+/// ```
 class PxResponsiveVisibility extends StatelessWidget {
+  /// The widget to show when visibility conditions are met.
   final Widget child;
+
+  /// Whether to show the child on mobile devices.
   final bool visibleOnMobile;
+
+  /// Whether to show the child on tablet devices.
   final bool visibleOnTablet;
+
+  /// Whether to show the child on desktop devices.
   final bool visibleOnDesktop;
+
+  /// Widget to show when child is hidden. Defaults to [SizedBox.shrink()].
   final Widget? replacement;
+
+  /// If true, the child's state is maintained even when hidden using [Offstage].
+  /// If false (default), the child is completely removed from the tree.
   final bool maintainState;
 
+  /// Creates a visibility widget with custom visibility rules.
+  ///
+  /// By default, the child is visible on all device types.
   const PxResponsiveVisibility({
     super.key,
     required this.child,
@@ -146,6 +219,13 @@ class PxResponsiveVisibility extends StatelessWidget {
   });
 
   /// Creates a visibility widget that only shows on mobile.
+  ///
+  /// Example:
+  /// ```dart
+  /// PxResponsiveVisibility.mobile(
+  ///   child: const MobileOnlyWidget(),
+  /// )
+  /// ```
   const PxResponsiveVisibility.mobile({
     super.key,
     required this.child,
@@ -156,6 +236,13 @@ class PxResponsiveVisibility extends StatelessWidget {
         visibleOnDesktop = false;
 
   /// Creates a visibility widget that only shows on tablet.
+  ///
+  /// Example:
+  /// ```dart
+  /// PxResponsiveVisibility.tablet(
+  ///   child: const TabletOnlyWidget(),
+  /// )
+  /// ```
   const PxResponsiveVisibility.tablet({
     super.key,
     required this.child,
@@ -166,6 +253,13 @@ class PxResponsiveVisibility extends StatelessWidget {
         visibleOnDesktop = false;
 
   /// Creates a visibility widget that only shows on desktop.
+  ///
+  /// Example:
+  /// ```dart
+  /// PxResponsiveVisibility.desktop(
+  ///   child: const DesktopOnlyWidget(),
+  /// )
+  /// ```
   const PxResponsiveVisibility.desktop({
     super.key,
     required this.child,
@@ -176,6 +270,13 @@ class PxResponsiveVisibility extends StatelessWidget {
         visibleOnDesktop = true;
 
   /// Creates a visibility widget that shows on tablet and desktop (not mobile).
+  ///
+  /// Example:
+  /// ```dart
+  /// PxResponsiveVisibility.tabletUp(
+  ///   child: const LargeScreenWidget(),
+  /// )
+  /// ```
   const PxResponsiveVisibility.tabletUp({
     super.key,
     required this.child,
@@ -186,6 +287,13 @@ class PxResponsiveVisibility extends StatelessWidget {
         visibleOnDesktop = true;
 
   /// Creates a visibility widget that shows on mobile and tablet (not desktop).
+  ///
+  /// Example:
+  /// ```dart
+  /// PxResponsiveVisibility.tabletDown(
+  ///   child: const SmallScreenWidget(),
+  /// )
+  /// ```
   const PxResponsiveVisibility.tabletDown({
     super.key,
     required this.child,

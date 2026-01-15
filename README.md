@@ -280,11 +280,6 @@ This project is licensed under the MIT License - see the [LICENSE](https://www.g
 👥 Contributors
 We appreciate all contributions to this project! 
 
-
-
-
-
-
 <a href="https://www.google.com/search?q=https://github.com/IbrahimElmourchidi/px_responsive/graphs/contributors">
 <img src="https://www.google.com/search?q=https://contrib.rocks/image%3Frepo%3DIbrahimElmourchidi/px_responsive" />
 </a>
