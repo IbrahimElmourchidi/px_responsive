@@ -1,6 +1,6 @@
 name: px_responsive
 description: A powerful tri-tier responsive design system for Flutter. Automatically scales UI elements across mobile, tablet, and desktop based on your Figma/XD design specifications.
-version: 0.0.3
+version: 0.0.4
 homepage: https://github.com/IbrahimElmourchidi/px_responsive
 repository: https://github.com/IbrahimElmourchidi/px_responsive
 issue_tracker: https://github.com/IbrahimElmourchidi/px_responsive/issues
