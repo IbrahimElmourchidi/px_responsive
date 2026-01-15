@@ -3,7 +3,7 @@
 A powerful tri-tier responsive design system for Flutter that automatically scales your UI across mobile, tablet, and desktop platforms based on your Figma/XD design specifications.
 
 [![pub package](https://img.shields.io/pub/v/px_responsive.svg)](https://pub.dev/packages/px_responsive)
-[![License: BSD-3](https://img.shields.io/badge/License-BSD3-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
 
