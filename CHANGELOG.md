@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PxResponsive.reset()` now resets `safeAreaPadding` to `EdgeInsets.zero`
 - `PxResponsive.toString()` now includes orientation and safe area in output
 - `PxResponsiveConfig.copyWith()` gains `desktopLandscape`, `tabletLandscape`, `mobileLandscape` parameters
-- SDK constraint widened from `<4.0.0` to `<5.0.0`
+- SDK constraint kept at `<4.0.0` (pub.dev does not accept constraints that allow non-existent Dart versions)
 - Supported platforms expanded: added `macos`, `linux`, `windows` to `pubspec.yaml`
 - Version bumped to `0.1.0`
 
