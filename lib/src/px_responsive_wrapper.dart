@@ -111,11 +111,13 @@ class PxResponsiveWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Get device pixel ratio from MediaQuery if available
+        // Get device pixel ratio and safe area from MediaQuery if available
         double devicePixelRatio = 1.0;
+        EdgeInsets safeAreaPadding = EdgeInsets.zero;
         final mediaQuery = MediaQuery.maybeOf(context);
         if (mediaQuery != null) {
           devicePixelRatio = mediaQuery.devicePixelRatio;
+          safeAreaPadding = mediaQuery.padding;
         }
 
         // Initialize the responsive singleton with current constraints
@@ -123,6 +125,7 @@ class PxResponsiveWrapper extends StatelessWidget {
           constraints: constraints,
           config: config,
           devicePixelRatio: devicePixelRatio,
+          safeAreaPadding: safeAreaPadding,
         );
 
         // Use builder if provided, otherwise use child

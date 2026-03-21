@@ -1,5 +1,21 @@
 import 'package:flutter/widgets.dart';
 
+/// Represents the current device orientation.
+///
+/// Example:
+/// ```dart
+/// if (orientation == PxOrientation.landscape) {
+///   return LandscapeLayout();
+/// }
+/// ```
+enum PxOrientation {
+  /// Portrait orientation: height is greater than or equal to width.
+  portrait,
+
+  /// Landscape orientation: width is greater than height.
+  landscape,
+}
+
 /// Configuration class that holds the design baselines for all three device types.
 ///
 /// ## Basic Example
@@ -40,17 +56,43 @@ class PxResponsiveConfig {
   /// Common values: Size(1920, 1080), Size(1440, 900), Size(1366, 768)
   final Size desktop;
 
+  /// Base design size for Desktop layouts in landscape orientation.
+  ///
+  /// When set and the device is in landscape, this size is used instead of
+  /// [desktop] for scaling calculations. If null, [desktop] is always used.
+  final Size? desktopLandscape;
+
   /// Base design size for Tablet layouts.
   ///
   /// This should match your design tool's tablet artboard size.
   /// Common values: Size(834, 1194), Size(768, 1024), Size(1024, 768)
   final Size tablet;
 
+  /// Base design size for Tablet layouts in landscape orientation.
+  ///
+  /// When set and the device is in landscape, this size is used instead of
+  /// [tablet] for scaling calculations. If null, [tablet] is always used.
+  final Size? tabletLandscape;
+
   /// Base design size for Mobile layouts.
   ///
   /// This should match your design tool's mobile artboard size.
   /// Common values: Size(375, 812), Size(360, 640), Size(414, 896)
   final Size mobile;
+
+  /// Base design size for Mobile layouts in landscape orientation.
+  ///
+  /// When set and the device is in landscape, this size is used instead of
+  /// [mobile] for scaling calculations. If null, [mobile] is always used.
+  ///
+  /// Example:
+  /// ```dart
+  /// PxResponsiveConfig(
+  ///   mobile: Size(375, 812),
+  ///   mobileLandscape: Size(812, 375),
+  /// )
+  /// ```
+  final Size? mobileLandscape;
 
   /// The width threshold below which the layout is considered Mobile.
   ///
@@ -112,8 +154,11 @@ class PxResponsiveConfig {
   /// All size parameters should use logical pixels.
   const PxResponsiveConfig({
     this.desktop = const Size(1920, 1080),
+    this.desktopLandscape,
     this.tablet = const Size(834, 1194),
+    this.tabletLandscape,
     this.mobile = const Size(375, 812),
+    this.mobileLandscape,
     this.mobileBreakpoint = 600,
     this.tabletBreakpoint = 1200,
     this.maxWidth,
@@ -153,10 +198,22 @@ class PxResponsiveConfig {
   ///   maxTextScaleFactor: 1.3,
   /// );
   /// ```
+  /// Creates a copy of this config with the given fields replaced.
+  ///
+  /// Example:
+  /// ```dart
+  /// final newConfig = config.copyWith(
+  ///   maxWidth: 2560,
+  ///   mobileLandscape: Size(812, 375),
+  /// );
+  /// ```
   PxResponsiveConfig copyWith({
     Size? desktop,
+    Size? desktopLandscape,
     Size? tablet,
+    Size? tabletLandscape,
     Size? mobile,
+    Size? mobileLandscape,
     double? mobileBreakpoint,
     double? tabletBreakpoint,
     double? maxWidth,
@@ -166,8 +223,11 @@ class PxResponsiveConfig {
   }) {
     return PxResponsiveConfig(
       desktop: desktop ?? this.desktop,
+      desktopLandscape: desktopLandscape ?? this.desktopLandscape,
       tablet: tablet ?? this.tablet,
+      tabletLandscape: tabletLandscape ?? this.tabletLandscape,
       mobile: mobile ?? this.mobile,
+      mobileLandscape: mobileLandscape ?? this.mobileLandscape,
       mobileBreakpoint: mobileBreakpoint ?? this.mobileBreakpoint,
       tabletBreakpoint: tabletBreakpoint ?? this.tabletBreakpoint,
       maxWidth: maxWidth ?? this.maxWidth,
@@ -183,8 +243,11 @@ class PxResponsiveConfig {
 
     return other is PxResponsiveConfig &&
         other.desktop == desktop &&
+        other.desktopLandscape == desktopLandscape &&
         other.tablet == tablet &&
+        other.tabletLandscape == tabletLandscape &&
         other.mobile == mobile &&
+        other.mobileLandscape == mobileLandscape &&
         other.mobileBreakpoint == mobileBreakpoint &&
         other.tabletBreakpoint == tabletBreakpoint &&
         other.maxWidth == maxWidth &&
@@ -197,8 +260,11 @@ class PxResponsiveConfig {
   int get hashCode {
     return Object.hash(
       desktop,
+      desktopLandscape,
       tablet,
+      tabletLandscape,
       mobile,
+      mobileLandscape,
       mobileBreakpoint,
       tabletBreakpoint,
       maxWidth,
@@ -212,8 +278,11 @@ class PxResponsiveConfig {
   String toString() {
     return 'PxResponsiveConfig('
         'desktop: $desktop, '
+        'desktopLandscape: $desktopLandscape, '
         'tablet: $tablet, '
+        'tabletLandscape: $tabletLandscape, '
         'mobile: $mobile, '
+        'mobileLandscape: $mobileLandscape, '
         'mobileBreakpoint: $mobileBreakpoint, '
         'tabletBreakpoint: $tabletBreakpoint, '
         'maxWidth: $maxWidth, '

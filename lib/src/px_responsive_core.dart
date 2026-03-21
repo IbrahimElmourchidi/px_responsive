@@ -63,6 +63,9 @@ class PxResponsive {
   /// The active base size (Mobile, Tablet, or Desktop) chosen based on current width.
   Size _activeBaseSize = const Size(375, 812);
 
+  /// Safe area padding (notch, status bar, etc.) from MediaQuery.
+  EdgeInsets _safeAreaPadding = EdgeInsets.zero;
+
   /// Whether the singleton has been properly initialized.
   bool _isInitialized = false;
 
@@ -113,6 +116,57 @@ class PxResponsive {
   /// [PxResponsiveConfig.tablet], or [PxResponsiveConfig.desktop]
   /// based on the breakpoints.
   Size get activeBaseSize => _activeBaseSize;
+
+  // ============== Orientation Getters ==============
+
+  /// Returns `true` if the screen is in landscape orientation (width > height).
+  bool get isLandscape => _actualScreenWidth > _screenHeight;
+
+  /// Returns `true` if the screen is in portrait orientation (height >= width).
+  bool get isPortrait => !isLandscape;
+
+  /// Returns the current screen orientation as a [PxOrientation] enum.
+  ///
+  /// Example:
+  /// ```dart
+  /// if (PxResponsive().orientation == PxOrientation.landscape) {
+  ///   return LandscapeLayout();
+  /// }
+  /// ```
+  PxOrientation get orientation =>
+      isLandscape ? PxOrientation.landscape : PxOrientation.portrait;
+
+  /// Returns the appropriate value based on the current orientation.
+  ///
+  /// Example:
+  /// ```dart
+  /// double padding = PxResponsive().orientationValue(
+  ///   portrait: 16.0,
+  ///   landscape: 24.0,
+  /// );
+  /// ```
+  T orientationValue<T>({required T portrait, required T landscape}) =>
+      isLandscape ? landscape : portrait;
+
+  // ============== Safe Area Getters ==============
+
+  /// Returns the top safe area inset (status bar, notch).
+  double get safeAreaTop => _safeAreaPadding.top;
+
+  /// Returns the bottom safe area inset (home indicator).
+  double get safeAreaBottom => _safeAreaPadding.bottom;
+
+  /// Returns the left safe area inset.
+  double get safeAreaLeft => _safeAreaPadding.left;
+
+  /// Returns the right safe area inset.
+  double get safeAreaRight => _safeAreaPadding.right;
+
+  /// Returns the screen height minus top and bottom safe area insets.
+  ///
+  /// Useful for laying out content that should avoid system UI.
+  double get safeScreenHeight =>
+      _screenHeight - _safeAreaPadding.top - _safeAreaPadding.bottom;
 
   // ============== Device Type Getters ==============
 
@@ -292,21 +346,21 @@ class PxResponsive {
 
   // ============== Internal Methods ==============
 
-  /// Internal initialization method called by [PxResponsiveWrapper].
+  /// Initializes the responsive singleton with current screen constraints.
   ///
-  /// This method calculates the effective width based on [maxWidth] setting
-  /// and determines the active base size.
-  ///
-  /// Should not be called directly by users.
+  /// Called automatically by [PxResponsiveWrapper]. Should not be called
+  /// directly by users.
   void init({
     required BoxConstraints constraints,
     required PxResponsiveConfig config,
     double devicePixelRatio = 1.0,
+    EdgeInsets safeAreaPadding = EdgeInsets.zero,
   }) {
     _config = config;
     _actualScreenWidth = constraints.maxWidth;
     _screenHeight = constraints.maxHeight;
     _devicePixelRatio = devicePixelRatio;
+    _safeAreaPadding = safeAreaPadding;
     _isInitialized = true;
 
     // Calculate effective width: cap at maxWidth if specified
@@ -316,18 +370,27 @@ class PxResponsive {
       _effectiveWidth = _actualScreenWidth;
     }
 
-    // Determine active base size based on current width
-    // Note: We use actualScreenWidth for breakpoint comparison,
-    // not effectiveWidth. This ensures consistent layout switching.
+    // Determine active base size based on current width and orientation.
+    // We use actualScreenWidth for breakpoint comparison (not effectiveWidth)
+    // to ensure consistent layout switching.
     if (isMobile) {
-      _activeBaseSize = _config.mobile;
+      _activeBaseSize = isLandscape && _config.mobileLandscape != null
+          ? _config.mobileLandscape!
+          : _config.mobile;
     } else if (isTablet) {
-      _activeBaseSize = _config.tablet;
+      _activeBaseSize = isLandscape && _config.tabletLandscape != null
+          ? _config.tabletLandscape!
+          : _config.tablet;
     } else {
-      _activeBaseSize = _config.desktop;
+      _activeBaseSize = isLandscape && _config.desktopLandscape != null
+          ? _config.desktopLandscape!
+          : _config.desktop;
     }
   }
 
+  /// Resets the singleton to its initial state.
+  ///
+  /// Mainly used for testing purposes.
   /// Resets the singleton to its initial state.
   ///
   /// Mainly used for testing purposes.
@@ -338,6 +401,7 @@ class PxResponsive {
     _devicePixelRatio = 1.0;
     _effectiveWidth = 0;
     _activeBaseSize = const Size(375, 812);
+    _safeAreaPadding = EdgeInsets.zero;
     _isInitialized = false;
   }
 
@@ -349,10 +413,12 @@ class PxResponsive {
         'effectiveWidth: ${_effectiveWidth.toStringAsFixed(1)}, '
         'screenHeight: ${_screenHeight.toStringAsFixed(1)}, '
         'deviceType: $deviceType, '
+        'orientation: $orientation, '
         'activeBaseSize: $_activeBaseSize, '
         'scaleW: ${scaleW.toStringAsFixed(3)}, '
         'scaleH: ${scaleH.toStringAsFixed(3)}, '
         'scaleSp: ${scaleSp.toStringAsFixed(3)}, '
-        'scaleR: ${scaleR.toStringAsFixed(3)})';
+        'scaleR: ${scaleR.toStringAsFixed(3)}, '
+        'safeArea: $_safeAreaPadding)';
   }
 }

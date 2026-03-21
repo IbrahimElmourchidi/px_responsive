@@ -18,13 +18,25 @@ A powerful tri-tier responsive design system for Flutter that automatically scal
   - [Screen Percentage Extensions](#screen-percentage-extensions)
   - [Parent-Relative Extensions](#parent-relative-extensions)
   - [Clamping Methods](#clamping-methods)
+  - [Spacing Shorthands](#spacing-shorthands)
   - [Object Extensions](#object-extensions)
+  - [TextStyle & Icon Extensions](#textstyle--icon-extensions)
   - [Global Getters](#global-getters)
   - [Global Functions](#global-functions)
+  - [BuildContext Extensions](#buildcontext-extensions)
+- [Orientation Support](#orientation-support)
+- [Safe Area Awareness](#safe-area-awareness)
 - [Responsive Widgets](#responsive-widgets)
+  - [PxResponsiveWrapper](#pxresponsivewrapper)
+  - [PxResponsiveMediaQueryWrapper](#pxresponsivemediaquerywrapper)
   - [PxResponsiveBuilder](#pxresponsivebuilder)
   - [PxResponsiveValue](#pxresponsivevalue)
   - [PxResponsiveVisibility](#pxresponsivevisibility)
+  - [PxResponsivePadding](#pxresponsivepadding)
+  - [PxResponsiveGrid](#pxresponsivegrid)
+  - [AnimatedPxResponsiveBuilder](#animatedpxresponsivebuilder)
+  - [PxResponsiveDebug](#pxresponsivedebug)
+- [Platform Detection](#platform-detection)
 - [Configuration Options](#configuration-options)
 - [Best Practices](#best-practices)
 - [Ultra-Wide Screen Support](#ultra-wide-screen-support)
@@ -39,10 +51,14 @@ A powerful tri-tier responsive design system for Flutter that automatically scal
 - 🎯 **Tri-Tier Scaling** — Automatically switches between mobile, tablet, and desktop base designs
 - 📐 **Design-to-Code Mapping** — Use exact values from your Figma/XD designs
 - 🔒 **Safe Scaling** — Built-in min/max constraints prevent layout breaking
-- 📱 **Device Detection** — Simple `isMobile`, `isTablet`, `isDesktop` getters
+- 📱 **Device Detection** — Simple `isMobile`, `isTablet`, `isDesktop` getters and `BuildContext` extensions
+- 🔄 **Orientation Support** — `isLandscape`/`isPortrait` getters, orientation-specific base sizes, `orientationValue<T>()`
+- 🛡️ **Safe Area Awareness** — `safeAreaTop`, `safeAreaBottom`, `safeScreenHeight` populated automatically from `MediaQuery`
 - 🖥️ **Ultra-Wide Support** — Optional `maxWidth` cap for large displays
-- 🧩 **Rich Widget Library** — Responsive builders, visibility controls, and value providers
-- ✨ **Intuitive API** — Clean extension syntax (`.w`, `.h`, `.sp`, `.r`)
+- 🧩 **Rich Widget Library** — Responsive builders, visibility, padding, grid, animated transitions
+- 🔍 **Debug Overlay** — `PxResponsiveDebug` shows active breakpoint and scale factors at a glance
+- 🖥️ **Platform Detection** — `PxPlatformType` enum distinguishes Android, iOS, web, macOS, Windows, Linux
+- ✨ **Intuitive API** — Clean extension syntax (`.w`, `.h`, `.sp`, `.r`, `.verticalSpace`, `.horizontalSpace`)
 - 🌐 **WASM Compatible** — Pure Dart implementation, works everywhere Flutter runs
 
 ---
@@ -53,7 +69,7 @@ Add `px_responsive` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  px_responsive: ^0.0.1
+  px_responsive: ^0.1.0
 ```
 
 Then run:
@@ -68,26 +84,21 @@ flutter pub get
 
 ### 1. Wrap Your App
 
-Wrap your root widget with `PxResponsiveWrapper` and provide your design specifications:
-
 ```dart
 import 'package:flutter/material.dart';
 import 'package:px_responsive/px_responsive.dart';
 
 void main() {
   runApp(
-    PxResponsiveWrapper(
-      config: const PxResponsiveConfig(
-        // Your design tool's artboard sizes
+    const PxResponsiveWrapper(
+      config: PxResponsiveConfig(
         desktop: Size(1920, 1080),
         tablet: Size(834, 1194),
         mobile: Size(375, 812),
-        
-        // Breakpoints (when to switch layouts)
         mobileBreakpoint: 600,
         tabletBreakpoint: 1200,
       ),
-      child: const MyApp(),
+      child: MyApp(),
     ),
   );
 }
@@ -96,34 +107,44 @@ void main() {
 ### 2. Use Extensions in Your Widgets
 
 ```dart
-class MyWidget extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 200.w,              // Scaled width
-      height: 150.h,             // Scaled height
-      padding: EdgeInsets.all(16.r),  // Scaled padding
-      child: Text(
-        'Hello World',
-        style: TextStyle(fontSize: 18.sp),  // Scaled font
-      ),
-    );
-  }
-}
+Container(
+  width: 200.w,
+  height: 150.h,
+  padding: EdgeInsets.all(16.r),
+  child: Text(
+    'Hello World',
+    style: TextStyle(fontSize: 18.sp),
+  ),
+)
 ```
 
-### 3. Adapt to Device Types
+### 3. Use Spacing Shorthands
 
 ```dart
-Widget build(BuildContext context) {
-  if (isMobile) {
-    return MobileLayout();
-  } else if (isTablet) {
-    return TabletLayout();
-  } else {
-    return DesktopLayout();
-  }
-}
+Column(
+  children: [
+    Text('Title'),
+    16.verticalSpace,   // SizedBox(height: 16.h)
+    Text('Body'),
+  ],
+)
+```
+
+### 4. Adapt to Device Types
+
+```dart
+// Global getters
+if (isMobile) return MobileLayout();
+
+// BuildContext extensions
+if (context.isDesktop) return DesktopLayout();
+
+// Responsive builder widget
+PxResponsiveBuilder(
+  mobile: (_) => MobileLayout(),
+  tablet: (_) => TabletLayout(),
+  desktop: (_) => DesktopLayout(),
+)
 ```
 
 ---
@@ -132,33 +153,17 @@ Widget build(BuildContext context) {
 
 ### The Scaling Formula
 
-When you use `200.w`, the package calculates:
-
 ```
-result = 200 × (currentScreenWidth ÷ activeBaseDesignWidth)
+result = value × (currentScreenWidth ÷ activeBaseDesignWidth)
 ```
 
 ### Automatic Base Switching
 
-The package automatically selects the appropriate base design based on screen width:
-
-| Screen Width | Active Base | Example |
-|--------------|-------------|---------|
-| < 600px | Mobile (375×812) | Phones |
-| 600px – 1199px | Tablet (834×1194) | Tablets, small laptops |
-| ≥ 1200px | Desktop (1920×1080) | Desktops, large screens |
-
-### Visual Example
-
-```
-Mobile Design (375px wide)          Your Phone (390px wide)
-┌─────────────────┐                 ┌─────────────────┐
-│  Button: 100px  │      →          │  Button: 104px  │
-│  Font: 16px     │   Scaling       │  Font: 16.6px   │
-└─────────────────┘                 └─────────────────┘
-
-Scale Factor: 390 ÷ 375 = 1.04
-```
+| Screen Width | Active Base | Typical Device |
+|---|---|---|
+| < 600 px | Mobile (375 × 812) | Phones |
+| 600 – 1199 px | Tablet (834 × 1194) | Tablets, small laptops |
+| ≥ 1200 px | Desktop (1920 × 1080) | Desktops, large screens |
 
 ---
 
@@ -166,357 +171,318 @@ Scale Factor: 390 ÷ 375 = 1.04
 
 ### Core Extensions
 
-These are the primary extensions you'll use most often.
-
 | Extension | Description | Use Case |
-|-----------|-------------|----------|
-| `.w` | Width scaling | Container widths, horizontal padding/margins |
-| `.h` | Height scaling | Container heights, vertical padding/margins |
-| `.sp` | Font scaling | Text sizes (has tighter max constraint) |
-| `.r` | Radius scaling | Border radius, circular elements |
+|---|---|---|
+| `.w` | Width scaling | Container widths, horizontal padding |
+| `.h` | Height scaling | Container heights, vertical padding |
+| `.sp` | Font scaling (tighter max) | Text sizes |
+| `.r` | Radius scaling (min of w & h) | Border radius, circular elements |
 
 ```dart
 Container(
-  width: 300.w,                    // Scales with screen width
-  height: 200.h,                   // Scales with screen height
+  width: 300.w,
+  height: 200.h,
   decoration: BoxDecoration(
-    borderRadius: BorderRadius.circular(12.r),  // Uniform scaling
+    borderRadius: BorderRadius.circular(12.r),
   ),
-  child: Text(
-    'Responsive Text',
-    style: TextStyle(fontSize: 16.sp),  // Won't get too large
-  ),
+  child: Text('Hello', style: TextStyle(fontSize: 16.sp)),
 )
 ```
-
-#### When to Use Each
-
-| Scenario | Recommended Extension |
-|----------|----------------------|
-| Container/Card width | `.w` |
-| Container/Card height | `.h` |
-| Horizontal padding | `.w` |
-| Vertical padding | `.h` |
-| Symmetric padding | `.r` or `.w` |
-| Font sizes | `.sp` |
-| Icon sizes | `.sp` or `.r` |
-| Border radius | `.r` |
-| Avatar/Circle dimensions | `.r` |
-| Spacing between items | `.w` (horizontal) or `.h` (vertical) |
 
 ---
 
 ### Screen Percentage Extensions
 
-Use these when you want a percentage of the full screen.
-
-| Extension | Description | Example |
-|-----------|-------------|---------|
-| `.wf` | Percentage of screen width | `50.wf` = 50% of width |
-| `.hf` | Percentage of screen height | `25.hf` = 25% of height |
+| Extension | Description |
+|---|---|
+| `.wf` | Percentage of effective screen width |
+| `.hf` | Percentage of screen height |
 
 ```dart
-Container(
-  width: 80.wf,   // 80% of screen width
-  height: 50.hf,  // 50% of screen height
-  child: Text('Full-width card'),
-)
+Container(width: 80.wf, height: 50.hf)
 ```
-
-#### Best Use Cases
-
-- Full-width containers: `100.wf`
-- Half-screen layouts: `50.wf`
-- Modal dialogs: `90.wf` width, `80.hf` height
-- Hero sections: `100.wf` width, `60.hf` height
 
 ---
 
 ### Parent-Relative Extensions
 
-Use these when you need sizing relative to a parent widget, not the screen.
+Wrap the parent with `PxRelativeSizeProvider` to enable:
 
 | Extension | Description |
-|-----------|-------------|
+|---|---|
 | `.wr(context)` | Percentage of parent width |
 | `.hr(context)` | Percentage of parent height |
-
-**Setup Required:** Wrap the parent with `PxRelativeSizeProvider`:
 
 ```dart
 PxRelativeSizeProvider(
   child: Row(
     children: [
-      Container(
-        width: 30.wr(context),  // 30% of Row's width
-        child: Sidebar(),
-      ),
-      Container(
-        width: 70.wr(context),  // 70% of Row's width
-        child: MainContent(),
-      ),
+      Container(width: 30.wr(context), child: Sidebar()),
+      Container(width: 70.wr(context), child: MainContent()),
     ],
   ),
 )
 ```
 
-#### Best Use Cases
-
-- Split layouts within a container
-- Proportional grid items
-- Nested responsive layouts
-
 ---
 
 ### Clamping Methods
 
-Prevent values from going too small or too large.
-
-| Method | Description | Example |
-|--------|-------------|---------|
-| `.wMin(min)` | Width with minimum | `200.wMin(150)` — at least 150 |
-| `.wMax(max)` | Width with maximum | `200.wMax(300)` — at most 300 |
-| `.wClamp(min, max)` | Width within range | `200.wClamp(150, 300)` |
-| `.hMin(min)` | Height with minimum | `100.hMin(80)` |
-| `.hMax(max)` | Height with maximum | `100.hMax(120)` |
-| `.hClamp(min, max)` | Height within range | `100.hClamp(80, 120)` |
-| `.spMin(min)` | Font with minimum | `14.spMin(12)` |
-| `.spMax(max)` | Font with maximum | `24.spMax(32)` |
-| `.spClamp(min, max)` | Font within range | `16.spClamp(14, 20)` |
+| Method | Description |
+|---|---|
+| `.wMin(min)` / `.wMax(max)` / `.wClamp(min, max)` | Width with bounds |
+| `.hMin(min)` / `.hMax(max)` / `.hClamp(min, max)` | Height with bounds |
+| `.spMin(min)` / `.spMax(max)` / `.spClamp(min, max)` | Font with bounds |
+| `.rMin(min)` / `.rMax(max)` / `.rClamp(min, max)` | Radius with bounds |
 
 ```dart
-Container(
-  // Width scales but never below 200 or above 500
-  width: 300.wClamp(200, 500),
-  
-  child: Text(
-    'Readable Text',
-    // Font scales but stays between 14 and 22
-    style: TextStyle(fontSize: 18.spClamp(14, 22)),
-  ),
-)
+width: 200.wClamp(150, 300),   // Between 150 and 300
+fontSize: 14.spMin(12),         // At least 12
+borderRadius: 8.rMax(16),       // At most 16
 ```
 
-#### Best Use Cases
+---
 
-- Buttons that shouldn't be too small on tiny screens
-- Text that must remain readable
-- Images that shouldn't exceed a certain size
-- Cards with minimum touch targets
+### Spacing Shorthands
+
+```dart
+Column(
+  children: [
+    Text('Section Title'),
+    24.verticalSpace,       // SizedBox(height: 24.h)
+    Row(
+      children: [
+        Icon(Icons.home),
+        8.horizontalSpace,  // SizedBox(width: 8.w)
+        Text('Home'),
+      ],
+    ),
+  ],
+)
+```
 
 ---
 
 ### Object Extensions
 
-Scale entire objects at once.
-
-#### EdgeInsets Extensions
+#### EdgeInsets
 
 | Extension | Description |
-|-----------|-------------|
-| `.w` | All sides scaled by width factor |
-| `.scaled` | Horizontal by width, vertical by height |
-| `.r` | All sides scaled by radius factor |
+|---|---|
+| `.w` | All sides × scaleW |
+| `.scaled` | Horizontal × scaleW, vertical × scaleH |
+| `.r` | All sides × scaleR |
 
-```dart
-// All sides scale uniformly
-padding: EdgeInsets.all(16).w
-
-// Horizontal and vertical scale independently
-padding: EdgeInsets.symmetric(
-  horizontal: 20,
-  vertical: 16,
-).scaled
-
-// Uniform scaling for symmetric padding
-margin: EdgeInsets.all(12).r
-```
-
-#### Size Extensions
+#### Size
 
 | Extension | Description |
-|-----------|-------------|
-| `.scaled` | Width by scaleW, height by scaleH |
-| `.w` | Both dimensions by scaleW |
-| `.r` | Both dimensions by scaleR (uniform) |
+|---|---|
+| `.scaled` | Width × scaleW, height × scaleH |
+| `.w` | Both dimensions × scaleW |
+| `.r` | Both dimensions × scaleR |
 
-```dart
-// Aspect-ratio aware scaling
-Size imageSize = Size(400, 300).scaled;
-
-// Square that stays square
-Size avatarSize = Size(80, 80).r;
-```
-
-#### BorderRadius Extensions
+#### BorderRadius
 
 | Extension | Description |
-|-----------|-------------|
-| `.r` | All corners scaled by radius factor |
+|---|---|
+| `.r` | All corners × scaleR |
+
+---
+
+### TextStyle & Icon Extensions
+
+Scale text styles and icons in one call:
 
 ```dart
-decoration: BoxDecoration(
-  borderRadius: BorderRadius.circular(16).r,
+// TextStyle — scales fontSize, letterSpacing, wordSpacing
+Text(
+  'Hello',
+  style: TextStyle(fontSize: 16, letterSpacing: 0.5).responsive,
 )
 
-// Or with different corners
-borderRadius: BorderRadius.only(
-  topLeft: Radius.circular(20),
-  topRight: Radius.circular(20),
-).r
+// Icon — scales size by scaleSp
+Icon(Icons.home).responsive
+
+// Or with a custom base size:
+Icon(Icons.star, size: 32).responsive
 ```
 
 ---
 
 ### Global Getters
 
-Quick access to device information without calling `PxResponsive()`.
-
 | Getter | Type | Description |
-|--------|------|-------------|
+|---|---|---|
 | `isMobile` | `bool` | True if width < mobileBreakpoint |
 | `isTablet` | `bool` | True if between breakpoints |
 | `isDesktop` | `bool` | True if width ≥ tabletBreakpoint |
-| `deviceType` | `PxDeviceType` | Enum: `.mobile`, `.tablet`, `.desktop` |
+| `deviceType` | `PxDeviceType` | `.mobile` / `.tablet` / `.desktop` |
 | `screenWidth` | `double` | Actual screen width |
 | `screenHeight` | `double` | Actual screen height |
 | `effectiveWidth` | `double` | Width used for scaling (respects maxWidth) |
-
-```dart
-// Simple boolean checks
-if (isMobile) {
-  return CompactView();
-}
-
-// Switch on device type
-switch (deviceType) {
-  case PxDeviceType.mobile:
-    return MobileLayout();
-  case PxDeviceType.tablet:
-    return TabletLayout();
-  case PxDeviceType.desktop:
-    return DesktopLayout();
-}
-
-// Use dimensions directly
-final isLandscape = screenWidth > screenHeight;
-```
+| `isLandscape` | `bool` | True if width > height |
+| `isPortrait` | `bool` | True if height ≥ width |
+| `orientation` | `PxOrientation` | `.portrait` / `.landscape` |
 
 ---
 
 ### Global Functions
 
-#### responsiveValue
-
-Returns different values based on device type.
-
 ```dart
-T responsiveValue<T>({
-  required T mobile,
-  T? tablet,
-  T? desktop,
-})
+// Device-type value picker
+int columns = responsiveValue(mobile: 1, tablet: 2, desktop: 4);
+
+// Orientation value picker
+double padding = orientationValue(portrait: 16.0, landscape: 24.0);
 ```
 
+---
+
+### BuildContext Extensions
+
+Access responsive information directly from any `BuildContext`:
+
 ```dart
-// Different column counts
-int columns = responsiveValue(
-  mobile: 1,
-  tablet: 2,
-  desktop: 4,
-);
-
-// Different padding
-double padding = responsiveValue(
-  mobile: 16.0,
-  tablet: 24.0,
-  desktop: 32.0,
-);
-
-// Different widgets
-Widget icon = responsiveValue(
-  mobile: Icon(Icons.menu),
-  desktop: Icon(Icons.dashboard),
-);
+Widget build(BuildContext context) {
+  return Padding(
+    padding: EdgeInsets.all(context.isMobile ? 12.w : 24.w),
+    child: Text(
+      '${context.deviceType.name} — '
+      '${context.screenWidth.toStringAsFixed(0)} × '
+      '${context.screenHeight.toStringAsFixed(0)}',
+    ),
+  );
+}
 ```
 
-**Fallback Behavior:**
-- If `tablet` is null → uses `mobile`
-- If `desktop` is null → uses `tablet` (or `mobile` if tablet is also null)
+| Extension | Type |
+|---|---|
+| `context.responsive` | `PxResponsive` |
+| `context.isMobile` | `bool` |
+| `context.isTablet` | `bool` |
+| `context.isDesktop` | `bool` |
+| `context.deviceType` | `PxDeviceType` |
+| `context.screenWidth` | `double` |
+| `context.screenHeight` | `double` |
+| `context.isLandscape` | `bool` |
+| `context.isPortrait` | `bool` |
+
+---
+
+## Orientation Support
+
+Detect and react to device rotation anywhere in your widget tree.
+
+```dart
+// Global getters
+if (isLandscape) return LandscapeLayout();
+
+// Global function
+double padding = orientationValue(portrait: 16.0, landscape: 24.0);
+
+// PxResponsive instance
+PxOrientation current = PxResponsive().orientation;
+
+// BuildContext
+if (context.isPortrait) return PortraitCard();
+```
+
+### Landscape-Specific Design Sizes
+
+Provide alternate base sizes for landscape so scaling matches your landscape Figma frames:
+
+```dart
+PxResponsiveWrapper(
+  config: const PxResponsiveConfig(
+    mobile: Size(375, 812),
+    mobileLandscape: Size(812, 375),   // used when phone rotates
+    tablet: Size(834, 1194),
+    tabletLandscape: Size(1194, 834),
+  ),
+  child: const MyApp(),
+)
+```
+
+---
+
+## Safe Area Awareness
+
+Access system UI insets without calling `MediaQuery` manually:
+
+```dart
+final r = PxResponsive();
+
+print(r.safeAreaTop);       // status bar / notch
+print(r.safeAreaBottom);    // home indicator
+print(r.safeScreenHeight);  // screenHeight - top - bottom
+
+// Safe padding is captured automatically by PxResponsiveWrapper.
+// For explicit control, pass it in init():
+PxResponsive().init(
+  constraints: constraints,
+  config: config,
+  safeAreaPadding: MediaQuery.paddingOf(context),
+);
+```
 
 ---
 
 ## Responsive Widgets
 
-### PxResponsiveBuilder
+### PxResponsiveWrapper
 
-Build completely different widget trees for each device type.
-
-```dart
-PxResponsiveBuilder(
-  mobile: (context) => MobileLayout(),
-  tablet: (context) => TabletLayout(),
-  desktop: (context) => DesktopLayout(),
-)
-```
-
-**When to Use:**
-- Completely different layouts per device
-- Different navigation patterns (drawer vs sidebar)
-- Different component hierarchies
+Initialises the responsive singleton using `LayoutBuilder`. Place it above `MaterialApp`/`CupertinoApp`.
 
 ```dart
-// Navigation example
-PxResponsiveBuilder(
-  mobile: (context) => Scaffold(
-    drawer: NavigationDrawer(),
-    body: Content(),
-  ),
-  desktop: (context) => Row(
-    children: [
-      SideNavigation(),
-      Expanded(child: Content()),
-    ],
-  ),
+PxResponsiveWrapper(
+  config: const PxResponsiveConfig(maxWidth: 1920),
+  child: const MyApp(),
 )
 ```
 
 ---
 
+### PxResponsiveMediaQueryWrapper
+
+Alternative wrapper that reads screen size from `MediaQuery` instead of `LayoutBuilder`. Use when the wrapper is inside a constrained subtree (e.g., a `Dialog`).
+
+```dart
+PxResponsiveMediaQueryWrapper(
+  config: const PxResponsiveConfig(),
+  child: const MyWidget(),
+)
+```
+
+---
+
+### PxResponsiveBuilder
+
+Build completely different widget trees per device type.
+
+```dart
+PxResponsiveBuilder(
+  mobile: (_) => const MobileLayout(),
+  tablet: (_) => const TabletLayout(),
+  desktop: (_) => const DesktopLayout(),
+)
+```
+
+Fallback chain: desktop → tablet → mobile (if a builder is omitted).
+
+---
+
 ### PxResponsiveValue
 
-Provide different values and build with them.
+Provide different typed values and build with them.
 
 ```dart
 PxResponsiveValue<int>(
   mobile: 1,
   tablet: 2,
   desktop: 4,
-  builder: (context, columnCount) {
-    return GridView.count(
-      crossAxisCount: columnCount,
-      children: items,
-    );
-  },
-)
-```
-
-**When to Use:**
-- Same widget structure, different parameters
-- Grid layouts with varying columns
-- Dynamic spacing or sizing
-
-```dart
-// Dynamic grid
-PxResponsiveValue<int>(
-  mobile: 2,
-  tablet: 3,
-  desktop: 5,
-  builder: (context, columns) => GridView.builder(
-    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: columns,
-    ),
-    itemBuilder: (context, index) => ProductCard(products[index]),
+  builder: (context, columns) => GridView.count(
+    crossAxisCount: columns,
+    children: items,
   ),
 )
 ```
@@ -527,68 +493,151 @@ PxResponsiveValue<int>(
 
 Show or hide widgets based on device type.
 
-#### Default Constructor
-
 ```dart
-PxResponsiveVisibility(
-  visibleOnMobile: false,
-  visibleOnTablet: true,
-  visibleOnDesktop: true,
-  child: Sidebar(),
+// Only on desktop
+PxResponsiveVisibility.desktop(child: Sidebar())
+
+// Mobile and tablet
+PxResponsiveVisibility.tabletDown(child: CompactHeader())
+
+// With replacement and state preservation
+PxResponsiveVisibility.tabletUp(
+  replacement: const MenuButton(),
+  maintainState: true,
+  child: SideNavigation(),
 )
 ```
 
-#### Named Constructors
+| Constructor | Mobile | Tablet | Desktop |
+|---|---|---|---|
+| `.mobile()` | ✅ | ❌ | ❌ |
+| `.tablet()` | ❌ | ✅ | ❌ |
+| `.desktop()` | ❌ | ❌ | ✅ |
+| `.tabletUp()` | ❌ | ✅ | ✅ |
+| `.tabletDown()` | ✅ | ✅ | ❌ |
 
-| Constructor | Visible On |
-|-------------|------------|
-| `.mobile()` | Mobile only |
-| `.tablet()` | Tablet only |
-| `.desktop()` | Desktop only |
-| `.tabletUp()` | Tablet + Desktop |
-| `.tabletDown()` | Mobile + Tablet |
+---
+
+### PxResponsivePadding
+
+Apply device-specific padding with optional auto-scaling.
 
 ```dart
-// Sidebar only on desktop
-PxResponsiveVisibility.desktop(
-  child: Sidebar(),
+PxResponsivePadding(
+  mobile: const EdgeInsets.all(12),
+  tablet: const EdgeInsets.all(20),
+  desktop: const EdgeInsets.all(32),
+  scale: true,   // additionally applies .scaled
+  child: const MyContent(),
 )
+```
 
-// Mobile menu button
-PxResponsiveVisibility.mobile(
-  child: IconButton(
-    icon: Icon(Icons.menu),
-    onPressed: openDrawer,
+---
+
+### PxResponsiveGrid
+
+A `GridView` with automatic column count selection.
+
+```dart
+PxResponsiveGrid(
+  mobileColumns: 1,
+  tabletColumns: 2,
+  desktopColumns: 4,
+  spacing: 16.r,
+  childAspectRatio: 3 / 4,
+  children: productCards,
+)
+```
+
+| Parameter | Description |
+|---|---|
+| `mobileColumns` | Columns on mobile (required) |
+| `tabletColumns` | Columns on tablet (falls back to mobile) |
+| `desktopColumns` | Columns on desktop (falls back to tablet) |
+| `spacing` | Cross-axis spacing |
+| `runSpacing` | Main-axis spacing (defaults to `spacing`) |
+| `childAspectRatio` | Width / height ratio of each item |
+| `shrinkWrap` | Set `true` inside non-scrollable parents |
+
+---
+
+### AnimatedPxResponsiveBuilder
+
+Smoothly transitions between layouts when the device type changes (e.g., desktop window resize).
+
+```dart
+AnimatedPxResponsiveBuilder(
+  duration: const Duration(milliseconds: 300),
+  switchInCurve: Curves.easeOut,
+  mobile: (_) => const MobileLayout(),
+  tablet: (_) => const TabletLayout(),
+  desktop: (_) => const DesktopLayout(),
+)
+```
+
+Uses `AnimatedSwitcher` with `FadeTransition` by default. Pass a custom `transitionBuilder` for other effects.
+
+---
+
+### PxResponsiveDebug
+
+Overlay that shows current breakpoint, scale factors, and orientation during development.
+
+```dart
+PxResponsiveWrapper(
+  config: config,
+  child: PxResponsiveDebug(
+    enabled: kDebugMode,   // remove in release
+    child: const MyApp(),
   ),
 )
-
-// Show on tablet and up
-PxResponsiveVisibility.tabletUp(
-  child: ExtendedNavigation(),
-  replacement: CompactNavigation(), // Shown when hidden
-)
 ```
 
-#### Options
+The overlay is positioned top-right and shows:
 
-| Property | Description |
-|----------|-------------|
-| `replacement` | Widget shown when child is hidden |
-| `maintainState` | Keep child's state when hidden (uses Offstage) |
+```
+device : mobile
+screen : 375×812
+orient : portrait
+base   : 375×812
+scaleW : 1.000
+scaleH : 1.000
+scaleSp: 1.000
+scaleR : 1.000
+effW   : 375
+```
+
+---
+
+## Platform Detection
+
+Detect the underlying OS independently of screen width:
 
 ```dart
-PxResponsiveVisibility.desktop(
-  maintainState: true,  // Keep sidebar state when switching to tablet
-  child: Sidebar(),
-  replacement: CollapsedSidebar(),
-)
+import 'package:px_responsive/px_responsive.dart';
+
+// Top-level getters
+if (isNativeMobile) requestCameraPermission();
+if (isNativeDesktop) showMenuBar();
+if (isPlatformWeb) openBrowserLink(url);
+
+// Full enum
+switch (platformType) {
+  case PxPlatformType.ios:
+    return const CupertinoButton(child: Text('OK'), onPressed: null);
+  case PxPlatformType.android:
+    return ElevatedButton(onPressed: null, child: const Text('OK'));
+  default:
+    return TextButton(onPressed: null, child: const Text('OK'));
+}
 ```
 
-**When to Use:**
-- Hiding navigation elements on mobile
-- Showing/hiding sidebars
-- Conditional feature visibility
-- Progressive disclosure of UI elements
+| Getter | Description |
+|---|---|
+| `platformType` | `PxPlatformType` enum value |
+| `isNativeMobile` | `true` for Android or iOS |
+| `isNativeDesktop` | `true` for macOS, Windows, or Linux |
+| `isPlatformWeb` | `true` when running in a browser |
 
 ---
 
@@ -598,64 +647,69 @@ PxResponsiveVisibility.desktop(
 
 ```dart
 const PxResponsiveConfig({
-  // Base design sizes from your design tool
+  // Portrait design sizes (required baselines)
   Size desktop = const Size(1920, 1080),
-  Size tablet = const Size(834, 1194),
-  Size mobile = const Size(375, 812),
-  
+  Size tablet  = const Size(834, 1194),
+  Size mobile  = const Size(375, 812),
+
+  // Landscape design sizes (optional — activates on rotation)
+  Size? desktopLandscape,
+  Size? tabletLandscape,
+  Size? mobileLandscape,
+
   // Breakpoints
-  double mobileBreakpoint = 600,    // Below this = mobile
-  double tabletBreakpoint = 1200,   // Above this = desktop
-  
+  double mobileBreakpoint = 600,    // below this → mobile
+  double tabletBreakpoint = 1200,   // above this → desktop
+
+  // Ultra-wide cap
+  double? maxWidth,                 // null = no cap
+
   // Scaling constraints
-  double? maxWidth,                 // Cap width for ultra-wide screens
-  double? minScaleFactor = 0.5,     // Elements won't shrink below 50%
-  double? maxScaleFactor = 2.0,     // Elements won't grow beyond 200%
-  double? maxTextScaleFactor = 1.5, // Text won't grow beyond 150%
+  double? minScaleFactor = 0.5,
+  double? maxScaleFactor = 2.0,
+  double? maxTextScaleFactor = 1.5,
 })
 ```
 
-### Common Design Sizes
-
-| Platform | Common Sizes |
-|----------|--------------|
-| Mobile | 375×812 (iPhone X), 360×640 (Android), 414×896 (iPhone Plus) |
-| Tablet | 834×1194 (iPad Pro 11"), 768×1024 (iPad), 1024×768 (Landscape) |
-| Desktop | 1920×1080 (Full HD), 1440×900 (MacBook), 1366×768 (Laptop) |
-
-### Configuration Examples
+### Common Configurations
 
 #### Standard Setup
 
 ```dart
-PxResponsiveConfig(
+const PxResponsiveConfig(
   desktop: Size(1440, 900),
   tablet: Size(768, 1024),
   mobile: Size(375, 812),
 )
 ```
 
-#### With Ultra-Wide Support
+#### With Landscape Support
 
 ```dart
-PxResponsiveConfig(
-  desktop: Size(1920, 1080),
-  tablet: Size(834, 1194),
+const PxResponsiveConfig(
   mobile: Size(375, 812),
-  maxWidth: 1920,  // Content won't stretch beyond 1920px
+  mobileLandscape: Size(812, 375),
+  tablet: Size(834, 1194),
+  tabletLandscape: Size(1194, 834),
+)
+```
+
+#### With Ultra-Wide Cap
+
+```dart
+const PxResponsiveConfig(
+  desktop: Size(1920, 1080),
+  maxWidth: 1920,
 )
 ```
 
 #### Conservative Scaling
 
 ```dart
-PxResponsiveConfig(
-  desktop: Size(1920, 1080),
-  tablet: Size(834, 1194),
-  mobile: Size(375, 812),
-  minScaleFactor: 0.8,      // Don't shrink too much
-  maxScaleFactor: 1.5,      // Don't grow too much
-  maxTextScaleFactor: 1.2,  // Keep text readable
+const PxResponsiveConfig(
+  minScaleFactor: 0.8,
+  maxScaleFactor: 1.5,
+  maxTextScaleFactor: 1.2,
 )
 ```
 
@@ -665,109 +719,58 @@ PxResponsiveConfig(
 
 ### 1. Match Your Design Tool
 
-Always use the exact artboard sizes from your design tool:
-
 ```dart
 // If your Figma mobile frame is 390×844
 mobile: Size(390, 844),
-
-// If your XD desktop artboard is 1440×900
 desktop: Size(1440, 900),
 ```
 
-### 2. Use Appropriate Extensions
+### 2. Use the Right Extension
 
-```dart
-// ✅ Good
-width: 200.w,           // Horizontal → use .w
-height: 100.h,          // Vertical → use .h
-fontSize: 16.sp,        // Text → use .sp
-borderRadius: 12.r,     // Radius → use .r
-
-// ❌ Avoid
-width: 200.h,           // Don't use .h for width
-fontSize: 16.w,         // Don't use .w for fonts
-```
+| Scenario | Extension |
+|---|---|
+| Container width | `.w` |
+| Container height | `.h` |
+| Font size | `.sp` |
+| Border radius / circles | `.r` |
+| Vertical gap | `.verticalSpace` |
+| Horizontal gap | `.horizontalSpace` |
 
 ### 3. Clamp Critical Values
 
 ```dart
-// Ensure buttons are always tappable (min 44px)
-height: 48.hMin(44),
-
-// Ensure text is always readable
-fontSize: 14.spMin(12),
-
-// Prevent images from getting too large
-width: 400.wMax(500),
+height: 48.hMin(44),           // Always tappable
+fontSize: 14.spMin(12),        // Always readable
+borderRadius: 8.rClamp(4, 16), // Stays proportional
 ```
 
-### 4. Use Device-Specific Values
+### 4. Use the Debug Overlay During Development
 
 ```dart
-// Different spacing per device
-padding: EdgeInsets.all(
-  responsiveValue(mobile: 12, tablet: 16, desktop: 24).w
-),
-
-// Different layouts
-crossAxisCount: responsiveValue(mobile: 2, tablet: 3, desktop: 4),
-```
-
-### 5. Combine Extensions Thoughtfully
-
-```dart
-// Responsive padding with scaling
-padding: EdgeInsets.symmetric(
-  horizontal: responsiveValue(mobile: 16, tablet: 24, desktop: 32).w,
-  vertical: responsiveValue(mobile: 12, tablet: 16, desktop: 20).h,
-),
+PxResponsiveDebug(
+  enabled: kDebugMode,
+  child: MyApp(),
+)
 ```
 
 ---
 
 ## Ultra-Wide Screen Support
 
-On ultra-wide monitors (3840px+), UI elements can become excessively large. Use `maxWidth` to cap scaling:
-
-### Without maxWidth
+Use `maxWidth` to prevent UI from stretching on 4K/ultrawide monitors:
 
 ```
-Screen: 3840px → Scale: 3840/1920 = 2.0×
-A 200px button becomes 400px (too large!)
+Without maxWidth: 3840 px → scale 2.0 × → 200 px button becomes 400 px
+With maxWidth 1920: 3840 px → effective 1920 px → scale 1.0 × → 200 px
 ```
-
-### With maxWidth: 1920
-
-```
-Screen: 3840px → Effective: 1920px → Scale: 1.0×
-A 200px button stays 200px (centered on screen)
-```
-
-### Implementation
 
 ```dart
 PxResponsiveWrapper(
-  config: PxResponsiveConfig(
+  config: const PxResponsiveConfig(
     desktop: Size(1920, 1080),
-    maxWidth: 1920,  // ← Add this
+    maxWidth: 1920,
   ),
   child: MyApp(),
-)
-```
-
-### Centering Content
-
-When using `maxWidth`, center your content for the best appearance:
-
-```dart
-Scaffold(
-  body: Center(
-    child: ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: 1920),
-      child: YourContent(),
-    ),
-  ),
 )
 ```
 
@@ -776,19 +779,18 @@ Scaffold(
 ## Complete Example
 
 ```dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:px_responsive/px_responsive.dart';
 
 void main() {
   runApp(
-    PxResponsiveWrapper(
-      config: const PxResponsiveConfig(
-        desktop: Size(1920, 1080),
-        tablet: Size(834, 1194),
-        mobile: Size(375, 812),
+    const PxResponsiveWrapper(
+      config: PxResponsiveConfig(
+        mobileLandscape: Size(812, 375),
         maxWidth: 1920,
       ),
-      child: const MyApp(),
+      child: MyApp(),
     ),
   );
 }
@@ -799,7 +801,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: const HomePage(),
+      home: PxResponsiveDebug(
+        enabled: kDebugMode,
+        child: const HomePage(),
+      ),
     );
   }
 }
@@ -811,11 +816,7 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'px_responsive Demo',
-          style: TextStyle(fontSize: 20.sp),
-        ),
-        // Show menu button only on mobile
+        title: Text('My App', style: TextStyle(fontSize: 20.sp)),
         leading: PxResponsiveVisibility.mobile(
           child: IconButton(
             icon: const Icon(Icons.menu),
@@ -825,58 +826,55 @@ class HomePage extends StatelessWidget {
       ),
       body: Row(
         children: [
-          // Sidebar only on desktop
           PxResponsiveVisibility.desktop(
             child: Container(
-              width: 250.w,
-              color: Colors.grey[200],
+              width: 240.w,
+              color: Colors.grey[100],
               child: const Center(child: Text('Sidebar')),
             ),
           ),
-          
-          // Main content
           Expanded(
-            child: Padding(
-              padding: EdgeInsets.all(
-                responsiveValue(mobile: 16, tablet: 24, desktop: 32).w,
-              ),
-              child: PxResponsiveValue<int>(
-                mobile: 1,
-                tablet: 2,
-                desktop: 3,
-                builder: (context, columns) {
-                  return GridView.builder(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      spacing: 16.w,
-                      childAspectRatio: 1.2,
+            child: PxResponsivePadding(
+              mobile: const EdgeInsets.all(12),
+              desktop: const EdgeInsets.all(32),
+              scale: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hello, ${context.deviceType.name}!',
+                    style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold),
+                  ),
+                  16.verticalSpace,
+                  Text(
+                    orientationValue(
+                      portrait: 'Portrait mode',
+                      landscape: 'Landscape mode',
                     ),
-                    itemCount: 9,
-                    itemBuilder: (context, index) => Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(16.r),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.star, size: 40.sp),
-                            SizedBox(height: 8.h),
-                            Text(
-                              'Item $index',
-                              style: TextStyle(fontSize: 16.sp),
-                            ),
-                          ],
+                    style: TextStyle(fontSize: 14.sp),
+                  ),
+                  16.verticalSpace,
+                  PxResponsiveGrid(
+                    mobileColumns: 2,
+                    tabletColumns: 3,
+                    desktopColumns: 4,
+                    spacing: 12.r,
+                    shrinkWrap: true,
+                    children: List.generate(
+                      8,
+                      (i) => Card(
+                        child: Center(
+                          child: Text('Item $i', style: TextStyle(fontSize: 14.sp)),
                         ),
                       ),
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
             ),
           ),
         ],
       ),
-      
-      // Bottom navigation only on mobile
       bottomNavigationBar: PxResponsiveVisibility.mobile(
         child: BottomNavigationBar(
           items: const [
@@ -895,13 +893,7 @@ class HomePage extends StatelessWidget {
 
 ## WASM Support
 
-This package is fully compatible with Flutter's WebAssembly (WASM) compilation target. It uses only:
-
-- Pure Dart code
-- Standard Flutter widgets
-- No platform-specific plugins
-
-Simply compile your Flutter web app to WASM as usual:
+This package is fully compatible with Flutter's WebAssembly (WASM) compilation target. It uses only pure Dart code and standard Flutter widgets with no platform-specific plugins.
 
 ```bash
 flutter build web --wasm
@@ -911,7 +903,7 @@ flutter build web --wasm
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ---
 
@@ -937,12 +929,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 </div>
 
 ---
+
 ## 👥 Contributors
-We appreciate all contributions to this project! 
+
+We appreciate all contributions to this project!
 
 <a href="https://github.com/IbrahimElmourchidi/px_responsive/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=IbrahimElmourchidi/px_responsive" />
 </a>
+
 ---
 
 ## Support

@@ -87,6 +87,21 @@ double get screenHeight => PxResponsive().screenHeight;
 /// ```
 double get effectiveWidth => PxResponsive().effectiveWidth;
 
+/// Returns `true` if the screen is in landscape orientation.
+///
+/// Equivalent to: `PxResponsive().isLandscape`
+bool get isLandscape => PxResponsive().isLandscape;
+
+/// Returns `true` if the screen is in portrait orientation.
+///
+/// Equivalent to: `PxResponsive().isPortrait`
+bool get isPortrait => PxResponsive().isPortrait;
+
+/// Returns the current screen orientation as a [PxOrientation] enum.
+///
+/// Equivalent to: `PxResponsive().orientation`
+PxOrientation get orientation => PxResponsive().orientation;
+
 // ============================================================================
 // GLOBAL FUNCTIONS
 // ============================================================================
@@ -116,6 +131,15 @@ T responsiveValue<T>({
     desktop: desktop,
   );
 }
+
+/// Returns the appropriate value based on the current screen orientation.
+///
+/// Example:
+/// ```dart
+/// double padding = orientationValue(portrait: 16.0, landscape: 24.0);
+/// ```
+T orientationValue<T>({required T portrait, required T landscape}) =>
+    PxResponsive().orientationValue(portrait: portrait, landscape: landscape);
 
 // ============================================================================
 // NUM EXTENSIONS - Core responsive scaling
@@ -309,6 +333,30 @@ extension PxResponsiveNumExtension on num {
   /// fontSize: 16.spClamp(12, 20) // Between 12 and 20
   /// ```
   double spClamp(double minimum, double maximum) => sp.clamp(minimum, maximum);
+
+  /// Returns this value scaled by radius with a custom minimum.
+  ///
+  /// Example:
+  /// ```dart
+  /// borderRadius: BorderRadius.circular(8.rMin(6))
+  /// ```
+  double rMin(double minimum) => math.max(r, minimum);
+
+  /// Returns this value scaled by radius with a custom maximum.
+  ///
+  /// Example:
+  /// ```dart
+  /// borderRadius: BorderRadius.circular(12.rMax(16))
+  /// ```
+  double rMax(double maximum) => math.min(r, maximum);
+
+  /// Returns this value scaled by radius, clamped between min and max.
+  ///
+  /// Example:
+  /// ```dart
+  /// borderRadius: BorderRadius.circular(10.rClamp(6, 14))
+  /// ```
+  double rClamp(double minimum, double maximum) => r.clamp(minimum, maximum);
 }
 
 // ============================================================================
@@ -539,6 +587,106 @@ extension PxResponsiveSizeExtension on Size {
 // ============================================================================
 // BORDERRADIUS EXTENSIONS
 // ============================================================================
+
+// ============================================================================
+// BUILDCONTEXT EXTENSIONS
+// ============================================================================
+
+/// Extensions on [BuildContext] for convenient responsive access.
+///
+/// These extensions expose the most commonly used responsive properties
+/// directly on [BuildContext], following idiomatic Flutter patterns.
+///
+/// Example:
+/// ```dart
+/// Widget build(BuildContext context) {
+///   if (context.isMobile) return MobileLayout();
+///   if (context.isTablet) return TabletLayout();
+///   return DesktopLayout();
+/// }
+/// ```
+extension PxResponsiveContextExtension on BuildContext {
+  /// The singleton [PxResponsive] instance.
+  PxResponsive get responsive => PxResponsive();
+
+  /// Returns `true` if the current screen is mobile.
+  bool get isMobile => PxResponsive().isMobile;
+
+  /// Returns `true` if the current screen is tablet.
+  bool get isTablet => PxResponsive().isTablet;
+
+  /// Returns `true` if the current screen is desktop.
+  bool get isDesktop => PxResponsive().isDesktop;
+
+  /// Returns the current device type as [PxDeviceType].
+  PxDeviceType get deviceType => PxResponsive().deviceType;
+
+  /// Returns the current screen width in logical pixels.
+  double get screenWidth => PxResponsive().screenWidth;
+
+  /// Returns the current screen height in logical pixels.
+  double get screenHeight => PxResponsive().screenHeight;
+
+  /// Returns `true` if the screen is in landscape orientation.
+  bool get isLandscape => PxResponsive().isLandscape;
+
+  /// Returns `true` if the screen is in portrait orientation.
+  bool get isPortrait => PxResponsive().isPortrait;
+}
+
+// ============================================================================
+// TEXTSTYLE EXTENSIONS
+// ============================================================================
+
+/// Extensions on [TextStyle] for responsive font scaling.
+///
+/// Example:
+/// ```dart
+/// Text(
+///   'Hello',
+///   style: TextStyle(fontSize: 16, letterSpacing: 0.5).responsive,
+/// )
+/// ```
+extension PxResponsiveTextStyleExtension on TextStyle {
+  /// Returns a new [TextStyle] with fontSize, letterSpacing, and wordSpacing
+  /// scaled by the current responsive scale factors.
+  TextStyle get responsive => copyWith(
+        fontSize: fontSize != null ? fontSize! * PxResponsive().scaleSp : null,
+        letterSpacing: letterSpacing != null
+            ? letterSpacing! * PxResponsive().scaleW
+            : null,
+        wordSpacing:
+            wordSpacing != null ? wordSpacing! * PxResponsive().scaleW : null,
+      );
+}
+
+// ============================================================================
+// ICON EXTENSIONS
+// ============================================================================
+
+/// Extensions on [Icon] for responsive sizing.
+///
+/// Example:
+/// ```dart
+/// Icon(Icons.home).responsive
+/// ```
+extension PxResponsiveIconExtension on Icon {
+  /// Returns a new [Icon] with its size scaled by [PxResponsive.scaleSp].
+  ///
+  /// Falls back to 24 logical pixels if [size] is null.
+  Icon get responsive => Icon(
+        icon,
+        size: (size ?? 24) * PxResponsive().scaleSp,
+        color: color,
+        fill: fill,
+        weight: weight,
+        grade: grade,
+        opticalSize: opticalSize,
+        shadows: shadows,
+        semanticLabel: semanticLabel,
+        textDirection: textDirection,
+      );
+}
 
 /// Extensions on [BorderRadius] for responsive scaling.
 ///
