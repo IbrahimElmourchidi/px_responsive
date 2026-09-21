@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'px_responsive_config.dart';
 import 'px_responsive_core.dart';
+import 'px_responsive_data.dart';
+import 'px_responsive_scope.dart';
 
 // ============================================================================
 // MEDIA QUERY WRAPPER - Uses MediaQuery instead of LayoutBuilder
@@ -37,6 +39,9 @@ import 'px_responsive_core.dart';
 ///   );
 /// }
 /// ```
+///
+/// See [PxResponsiveWrapper] for details on reactivity ([forceRebuildOnChange])
+/// and nested-wrapper behaviour, both of which apply identically here.
 class PxResponsiveMediaQueryWrapper extends StatelessWidget {
   /// The child widget to render.
   ///
@@ -51,6 +56,9 @@ class PxResponsiveMediaQueryWrapper extends StatelessWidget {
   /// Configuration for the responsive system.
   final PxResponsiveConfig config;
 
+  /// See [PxResponsiveWrapper.forceRebuildOnChange].
+  final bool forceRebuildOnChange;
+
   /// Creates a media-query-based responsive wrapper.
   ///
   /// Either [child] or [builder] must be provided, but not both.
@@ -59,6 +67,7 @@ class PxResponsiveMediaQueryWrapper extends StatelessWidget {
     this.child,
     this.builder,
     this.config = const PxResponsiveConfig(),
+    this.forceRebuildOnChange = true,
   }) : assert(
           child != null || builder != null,
           'Either child or builder must be provided',
@@ -68,20 +77,27 @@ class PxResponsiveMediaQueryWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final size = mediaQuery.size;
+    final incomingConstraints = BoxConstraints(
+      maxWidth: size.width,
+      maxHeight: size.height,
+    );
 
-    PxResponsive().init(
-      constraints: BoxConstraints(
-        maxWidth: size.width,
-        maxHeight: size.height,
-      ),
+    final candidate = PxResponsiveData.fromSize(
+      size: size,
       config: config,
       devicePixelRatio: mediaQuery.devicePixelRatio,
       safeAreaPadding: mediaQuery.padding,
     );
 
-    if (builder != null) {
-      return builder!(context, PxResponsive());
-    }
-    return child!;
+    return pxBuildResponsiveSubtree(
+      context: context,
+      incomingConstraints: incomingConstraints,
+      candidate: candidate,
+      forceRebuildOnChange: forceRebuildOnChange,
+      buildChild: (data) {
+        if (builder != null) return builder!(context, PxResponsive());
+        return child!;
+      },
+    );
   }
 }

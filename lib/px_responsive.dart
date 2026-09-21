@@ -83,6 +83,8 @@ library;
 
 export 'src/px_responsive_config.dart';
 export 'src/px_responsive_core.dart';
+export 'src/px_responsive_data.dart';
+export 'src/px_responsive_scope.dart' hide pxDataOf;
 export 'src/px_responsive_wrapper.dart';
 export 'src/px_responsive_extensions.dart';
 export 'src/px_responsive_builder.dart';
@@ -93,3 +95,7 @@ export 'src/px_responsive_padding.dart';
 export 'src/px_responsive_grid.dart';
 export 'src/px_responsive_animated.dart';
 export 'src/px_responsive_platform.dart';
+// Deprecated global getters/functions (isMobile, screenWidth, orientation,
+// platformType, ...) — kept here for 0.1.x compatibility, removed in 0.3.0.
+// See `package:px_responsive/globals.dart` for a non-deprecated equivalent.
+export 'src/px_responsive_globals_deprecated.dart';

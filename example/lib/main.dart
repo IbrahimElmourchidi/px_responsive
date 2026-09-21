@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:px_responsive/px_responsive.dart';
+import 'package:px_responsive/globals.dart' show platformType;
+import 'package:px_responsive/px_responsive.dart' hide platformType;
 
 void main() {
   runApp(
@@ -7,6 +8,13 @@ void main() {
       config: PxResponsiveConfig(
         mobileLandscape: Size(812, 375),
         maxWidth: 1920,
+        // Past 1920px, content is centered in a 1920px column; this paints
+        // the empty space on either side instead of leaving it transparent
+        // (which would otherwise show whatever is behind the window).
+        maxWidthBackground: Color(0xFF0D1117),
+        // Smooths the mobile/tablet and tablet/desktop scale-factor jump
+        // across a 120px-wide band instead of switching abruptly.
+        transitionBand: 120,
       ),
       child: MyApp(),
     ),
@@ -38,7 +46,7 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'px_responsive v0.1.0',
+          'px_responsive v0.2.0',
           style: TextStyle(fontSize: 18.sp),
         ),
         actions: [
@@ -173,7 +181,7 @@ class _HomePage extends StatelessWidget {
           4.verticalSpace,
           Text(
             'Device: ${context.deviceType.name}  •  '
-            'Orientation: ${orientation.name}',
+            'Orientation: ${context.orientation.name}',
             style: TextStyle(fontSize: 14.sp),
           ),
           4.verticalSpace,
@@ -301,8 +309,17 @@ class _AboutPage extends StatelessWidget {
             style: TextStyle(fontSize: 28.sp, fontWeight: FontWeight.bold),
           ),
           8.verticalSpace,
-          Text('Version 0.1.0', style: TextStyle(fontSize: 14.sp)),
+          Text('Version 0.2.0', style: TextStyle(fontSize: 14.sp)),
           16.verticalSpace,
+          const _AboutRow(
+              label: 'Reactive resize/rotation (no more stale .w)',
+              done: true),
+          const _AboutRow(label: 'maxWidth centers content, not just scale',
+              done: true),
+          const _AboutRow(label: 'Hybrid tier detection (fixes landscape)',
+              done: true),
+          const _AboutRow(label: 'transitionBand (smooths breakpoint jump)',
+              done: true),
           const _AboutRow(label:'Orientation support', done: true),
           const _AboutRow(label:'Safe area awareness', done: true),
           const _AboutRow(label:'Context extensions', done: true),

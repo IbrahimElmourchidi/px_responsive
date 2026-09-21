@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'px_responsive_core.dart';
+import 'px_responsive_scope.dart';
 
 // ============================================================================
 // DEBUG OVERLAY - Visualise breakpoints and scale factors during development
@@ -23,7 +23,11 @@ import 'px_responsive_core.dart';
 /// )
 /// ```
 ///
-/// The overlay is positioned in the top-right corner by default.
+/// This works whether placed above or below [MaterialApp]/[CupertinoApp] —
+/// it supplies its own [Directionality] and doesn't depend on an ancestor
+/// for one.
+///
+/// The overlay is positioned in the top-left corner by default.
 class PxResponsiveDebug extends StatelessWidget {
   /// The child widget to render beneath the debug overlay.
   final Widget child;
@@ -45,49 +49,55 @@ class PxResponsiveDebug extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!enabled) return child;
 
-    final r = PxResponsive();
+    final data = pxDataOf(context);
 
     return Stack(
+      alignment: Alignment.topLeft,
       children: [
         child,
         Positioned(
           top: 0,
-          right: 0,
+          left: 0,
           child: IgnorePointer(
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              color: const Color(0xB3000000), // black 70 %
-              child: DefaultTextStyle(
-                style: const TextStyle(
-                  color: Color(0xFFFFFFFF),
-                  fontSize: 11,
-                  fontFamily: 'monospace',
-                  decoration: TextDecoration.none,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('device : ${r.deviceType.name}'),
-                    Text(
-                      'screen : '
-                      '${r.screenWidth.toStringAsFixed(0)}×'
-                      '${r.screenHeight.toStringAsFixed(0)}',
-                    ),
-                    Text('orient : ${r.orientation.name}'),
-                    Text(
-                      'base   : '
-                      '${r.activeBaseSize.width.toStringAsFixed(0)}×'
-                      '${r.activeBaseSize.height.toStringAsFixed(0)}',
-                    ),
-                    Text('scaleW : ${r.scaleW.toStringAsFixed(3)}'),
-                    Text('scaleH : ${r.scaleH.toStringAsFixed(3)}'),
-                    Text('scaleSp: ${r.scaleSp.toStringAsFixed(3)}'),
-                    Text('scaleR : ${r.scaleR.toStringAsFixed(3)}'),
-                    Text(
-                      'effW   : ${r.effectiveWidth.toStringAsFixed(0)}',
-                    ),
-                  ],
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                color: const Color(0xB3000000), // black 70 %
+                child: DefaultTextStyle(
+                  style: const TextStyle(
+                    color: Color(0xFFFFFFFF),
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                    decoration: TextDecoration.none,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('device : ${data.deviceType.name}'),
+                      Text(
+                        'screen : '
+                        '${data.screenWidth.toStringAsFixed(0)}×'
+                        '${data.screenHeight.toStringAsFixed(0)}',
+                      ),
+                      Text('orient : ${data.orientation.name}'),
+                      Text(
+                        'base   : '
+                        '${data.activeBaseSize.width.toStringAsFixed(0)}×'
+                        '${data.activeBaseSize.height.toStringAsFixed(0)}',
+                      ),
+                      if (data.isInTransition)
+                        Text('blend  : ${data.tierBlend.toStringAsFixed(2)}'),
+                      Text('scaleW : ${data.scaleW.toStringAsFixed(3)}'),
+                      Text('scaleH : ${data.scaleH.toStringAsFixed(3)}'),
+                      Text('scaleSp: ${data.scaleSp.toStringAsFixed(3)}'),
+                      Text('scaleR : ${data.scaleR.toStringAsFixed(3)}'),
+                      Text(
+                        'effW   : ${data.effectiveWidth.toStringAsFixed(0)}',
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
