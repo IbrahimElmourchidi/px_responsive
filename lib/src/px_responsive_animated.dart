@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'px_responsive_core.dart';
+import 'px_responsive_scope.dart';
 
 // ============================================================================
 // ANIMATED RESPONSIVE BUILDER
@@ -76,12 +76,12 @@ class AnimatedPxResponsiveBuilder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final responsive = PxResponsive();
+    final data = pxDataOf(context);
 
     final WidgetBuilder activeBuilder;
-    if (responsive.isDesktop) {
+    if (data.isDesktop) {
       activeBuilder = desktop ?? tablet ?? mobile;
-    } else if (responsive.isTablet) {
+    } else if (data.isTablet) {
       activeBuilder = tablet ?? mobile;
     } else {
       activeBuilder = mobile;
@@ -94,7 +94,7 @@ class AnimatedPxResponsiveBuilder extends StatelessWidget {
       transitionBuilder: transitionBuilder ??
           (child, animation) => FadeTransition(opacity: animation, child: child),
       child: KeyedSubtree(
-        key: ValueKey(responsive.deviceType),
+        key: ValueKey(data.deviceType),
         child: activeBuilder(context),
       ),
     );

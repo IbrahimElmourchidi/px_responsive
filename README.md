@@ -40,6 +40,9 @@ A powerful tri-tier responsive design system for Flutter that automatically scal
 - [Configuration Options](#configuration-options)
 - [Best Practices](#best-practices)
 - [Ultra-Wide Screen Support](#ultra-wide-screen-support)
+- [Reactivity](#reactivity)
+- [Limitations](#limitations)
+- [Migrating from 0.1.x](#migrating-from-01x)
 - [Complete Example](#complete-example)
 - [WASM Support](#wasm-support)
 - [License](#license)
@@ -54,7 +57,8 @@ A powerful tri-tier responsive design system for Flutter that automatically scal
 - 📱 **Device Detection** — Simple `isMobile`, `isTablet`, `isDesktop` getters and `BuildContext` extensions
 - 🔄 **Orientation Support** — `isLandscape`/`isPortrait` getters, orientation-specific base sizes, `orientationValue<T>()`
 - 🛡️ **Safe Area Awareness** — `safeAreaTop`, `safeAreaBottom`, `safeScreenHeight` populated automatically from `MediaQuery`
-- 🖥️ **Ultra-Wide Support** — Optional `maxWidth` cap for large displays
+- 🖥️ **Ultra-Wide Support** — `maxWidth` centers and constrains content on large displays, or just caps the scale factor
+- ⚡ **Reactive** — Resize/rotate and the whole tree updates, including plain `.w`/`.h`/`.sp` calls, not just widgets that read through context
 - 🧩 **Rich Widget Library** — Responsive builders, visibility, padding, grid, animated transitions
 - 🔍 **Debug Overlay** — `PxResponsiveDebug` shows active breakpoint and scale factors at a glance
 - 🖥️ **Platform Detection** — `PxPlatformType` enum distinguishes Android, iOS, web, macOS, Windows, Linux
@@ -311,6 +315,14 @@ Icon(Icons.star, size: 32).responsive
 
 ### Global Getters
 
+> **Deprecated as of 0.2.0.** These pollute the global namespace of every
+> file that imports this package, and don't participate in
+> `PxResponsiveScope`'s reactivity. Prefer the [BuildContext Extensions](#buildcontext-extensions)
+> below or `PxResponsive()` directly. For a drop-in, non-deprecated
+> replacement of these exact names, `import 'package:px_responsive/globals.dart'`
+> instead of (not alongside — the two declare the same names)
+> `package:px_responsive/px_responsive.dart`.
+
 | Getter | Type | Description |
 |---|---|---|
 | `isMobile` | `bool` | True if width < mobileBreakpoint |
@@ -327,6 +339,10 @@ Icon(Icons.star, size: 32).responsive
 ---
 
 ### Global Functions
+
+> Also deprecated as of 0.2.0 for the same reason as the Global Getters
+> above — prefer `PxResponsive().value(...)` / `PxResponsive().orientationValue(...)`,
+> or `import 'package:px_responsive/globals.dart'` for a drop-in replacement.
 
 ```dart
 // Device-type value picker
@@ -357,7 +373,7 @@ Widget build(BuildContext context) {
 
 | Extension | Type |
 |---|---|
-| `context.responsive` | `PxResponsive` |
+| `context.responsive` | `PxResponsiveData` |
 | `context.isMobile` | `bool` |
 | `context.isTablet` | `bool` |
 | `context.isDesktop` | `bool` |
@@ -366,6 +382,11 @@ Widget build(BuildContext context) {
 | `context.screenHeight` | `double` |
 | `context.isLandscape` | `bool` |
 | `context.isPortrait` | `bool` |
+| `context.orientation` | `PxOrientation` |
+
+These all read through `PxResponsiveScope` when available (falling back to
+`PxResponsive()`), so they rebuild correctly when the screen size changes —
+unlike the deprecated Global Getters above.
 
 ---
 
@@ -593,7 +614,10 @@ PxResponsiveWrapper(
 )
 ```
 
-The overlay is positioned top-right and shows:
+It supplies its own `Directionality`, so it works equally well placed above
+`MaterialApp` (as above) or below it (e.g. `home: PxResponsiveDebug(child: HomePage())`).
+
+The overlay is positioned top-left and shows:
 
 ```
 device : mobile
@@ -607,11 +631,19 @@ scaleR : 1.000
 effW   : 375
 ```
 
+A `blend` line also appears whenever `PxResponsiveConfig.transitionBand` has
+the current width mid-transition between two tiers.
+
 ---
 
 ## Platform Detection
 
 Detect the underlying OS independently of screen width:
+
+> As of 0.2.0, `platformType`/`isNativeMobile`/`isNativeDesktop`/`isPlatformWeb`
+> are deprecated on the main entrypoint (same reasoning as the
+> [Global Getters](#global-getters)); `import 'package:px_responsive/globals.dart'`
+> for a non-deprecated, drop-in replacement.
 
 ```dart
 import 'package:px_responsive/px_responsive.dart';
@@ -652,22 +684,39 @@ const PxResponsiveConfig({
   Size tablet  = const Size(834, 1194),
   Size mobile  = const Size(375, 812),
 
-  // Landscape design sizes (optional — activates on rotation)
+  // Landscape design sizes (optional — activates on rotation).
+  // If omitted, a portrait-shaped base (height > width) is auto-flipped
+  // in landscape unless autoFlipLandscapeBase is false.
   Size? desktopLandscape,
   Size? tabletLandscape,
   Size? mobileLandscape,
+  bool autoFlipLandscapeBase = true,
 
   // Breakpoints
   double mobileBreakpoint = 600,    // below this → mobile
   double tabletBreakpoint = 1200,   // above this → desktop
+  PxBreakpointAxis breakpointAxis = PxBreakpointAxis.hybrid,
 
-  // Ultra-wide cap
+  // Smooths the scale-factor jump at each breakpoint across a band of
+  // this many logical pixels, centered on the breakpoint. 0 = disabled
+  // (a hard switch, matching 0.1.x). PxDeviceType itself always still
+  // switches exactly at the breakpoint.
+  double transitionBand = 0,
+
+  // Ultra-wide cap. Past this width, content is centered and constrained
+  // to maxWidth (see maxWidthBehavior / maxWidthBackground below).
   double? maxWidth,                 // null = no cap
+  PxMaxWidthBehavior maxWidthBehavior = PxMaxWidthBehavior.constrain,
+  Color? maxWidthBackground,        // paints the space left/right of maxWidth
 
   // Scaling constraints
-  double? minScaleFactor = 0.5,
+  double? minScaleFactor,           // null = no floor (0.1.x default was 0.5)
   double? maxScaleFactor = 2.0,
   double? maxTextScaleFactor = 1.5,
+
+  // Skip PxResponsiveWrapper's force-rebuild walk (see "Reactivity" below)
+  // below this relative change. 0 = always rebuild on any change.
+  double rebuildEpsilon = 0,
 })
 ```
 
@@ -757,22 +806,33 @@ PxResponsiveDebug(
 
 ## Ultra-Wide Screen Support
 
-Use `maxWidth` to prevent UI from stretching on 4K/ultrawide monitors:
+Use `maxWidth` to prevent UI from stretching on 4K/ultrawide monitors. Every
+`.w`/`.h`/`.sp`/`.r` value scales as if the screen were capped at `maxWidth`:
 
 ```
 Without maxWidth: 3840 px → scale 2.0 × → 200 px button becomes 400 px
 With maxWidth 1920: 3840 px → effective 1920 px → scale 1.0 × → 200 px
 ```
 
+By default (`maxWidthBehavior: PxMaxWidthBehavior.constrain`), the app is
+also *physically* centered in a `maxWidth`-wide column, with empty space on
+either side — paint it with `maxWidthBackground`, or your window/OS
+background shows through:
+
 ```dart
 PxResponsiveWrapper(
   config: const PxResponsiveConfig(
     desktop: Size(1920, 1080),
     maxWidth: 1920,
+    maxWidthBackground: Color(0xFF0D1117),
   ),
   child: MyApp(),
 )
 ```
+
+Set `maxWidthBehavior: PxMaxWidthBehavior.scaleOnly` to keep the pre-0.2.0
+behaviour: only the scale factor is capped, and content still stretches
+full-bleed to the screen edge.
 
 ---
 
@@ -847,7 +907,7 @@ class HomePage extends StatelessWidget {
                   ),
                   16.verticalSpace,
                   Text(
-                    orientationValue(
+                    context.responsive.orientationValue(
                       portrait: 'Portrait mode',
                       landscape: 'Landscape mode',
                     ),
@@ -888,6 +948,65 @@ class HomePage extends StatelessWidget {
   }
 }
 ```
+
+---
+
+## Reactivity
+
+`PxResponsiveWrapper` re-derives its scale factors on every layout pass and
+keeps the whole tree in sync two ways:
+
+- This package's own widgets (`PxResponsiveBuilder`, `PxResponsiveValue`,
+  `PxResponsivePadding`, ...) and `context.responsive` read through a
+  `PxResponsiveScope` (an `InheritedWidget`), so they rebuild correctly and
+  cheaply — only actual dependents rebuild.
+- Plain `.w`/`.h`/`.sp`/`.r` calls have no `BuildContext` to depend on, so
+  `PxResponsiveWrapper` instead walks its subtree and marks every descendant
+  dirty when the data changes (`forceRebuildOnChange: true`, the default).
+  This is what makes a bare `Container(width: 200.w)` correct after a
+  resize or rotation without any code changes.
+
+On a resize-heavy desktop app, the walk touches every widget below the
+wrapper on every meaningful size change (typically every frame while
+dragging a window edge). If you've profiled this as a real cost:
+
+- Wrap a large, visually-static subtree (a map, a video player, a long
+  `const` list) in `PxResponsiveRebuildBoundary` to exempt it.
+- Set `PxResponsiveConfig.rebuildEpsilon` to a small relative threshold
+  (e.g. `0.005`) to skip the walk for sub-threshold changes. Because the
+  comparison is always against the last *applied* snapshot, error never
+  accumulates, but the app can sit up to `rebuildEpsilon` stale at rest.
+- Set `forceRebuildOnChange: false` if your app exclusively reads through
+  `PxResponsiveScope`/`context.responsive`/this package's own widgets.
+
+## Limitations
+
+- **Breakpoint jump.** Because each tier has its own base design size,
+  crossing a breakpoint without `transitionBand` set is a hard switch, not
+  a gradual change — with the default configuration, `16.sp` renders at
+  23.0px at width 1199 and 10.0px at width 1200. Set `transitionBand` (see
+  [Configuration Options](#configuration-options)) to spread that jump
+  across a band instead, or choose breakpoints away from your app's common
+  window widths.
+- **Nested wrappers.** Only the root-most `PxResponsiveWrapper` (the one
+  with no `PxResponsiveScope` already above it) writes to the static
+  `PxResponsive()` singleton. A nested wrapper still works correctly for
+  anything read through `PxResponsiveScope`/`context.responsive`/this
+  package's widgets beneath it, but bare `.w`/`.h`/`.sp`/`.r` calls inside
+  it read the *root* wrapper's data, not the nested one's. Nest wrappers
+  only when a subtree genuinely needs a different `PxResponsiveConfig`
+  accessed via context — not as a general pattern.
+- **Resize cost on desktop.** See [Reactivity](#reactivity) above.
+
+## Migrating from 0.1.x
+
+0.2.0 fixes a defect in 0.1.x where the widget tree could go stale after a
+resize or rotation; see the [CHANGELOG](CHANGELOG.md#020) for the full list
+of fixes and the handful of behavioural defaults that changed alongside it
+(`minScaleFactor`'s default, breakpoint detection for landscape phones,
+`maxWidth` now centering by default, and `context.responsive`'s return
+type). Most apps need no code changes — the changed defaults each have a
+config flag to restore the exact 0.1.x behaviour if you rely on it.
 
 ---
 

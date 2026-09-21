@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
-import 'px_responsive_core.dart';
 import 'px_responsive_extensions.dart';
+import 'px_responsive_scope.dart';
 
 // ============================================================================
 // RESPONSIVE PADDING WIDGET
@@ -75,12 +75,12 @@ class PxResponsivePadding extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final responsive = PxResponsive();
+    final data = pxDataOf(context);
     EdgeInsets padding;
 
-    if (responsive.isDesktop) {
+    if (data.isDesktop) {
       padding = desktop ?? tablet ?? mobile;
-    } else if (responsive.isTablet) {
+    } else if (data.isTablet) {
       padding = tablet ?? mobile;
     } else {
       padding = mobile;

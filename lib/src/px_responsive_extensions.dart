@@ -2,144 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'px_responsive_config.dart';
 import 'px_responsive_core.dart';
-
-// ============================================================================
-// GLOBAL GETTERS - Simple access to device type without PxResponsive()
-// ============================================================================
-
-/// Returns `true` if the current screen width is in the mobile range.
-///
-/// Equivalent to: `PxResponsive().isMobile`
-///
-/// Example:
-/// ```dart
-/// if (isMobile) {
-///   return MobileLayout();
-/// }
-/// ```
-bool get isMobile => PxResponsive().isMobile;
-
-/// Returns `true` if the current screen width is in the tablet range.
-///
-/// Equivalent to: `PxResponsive().isTablet`
-///
-/// Example:
-/// ```dart
-/// if (isTablet) {
-///   return TabletLayout();
-/// }
-/// ```
-bool get isTablet => PxResponsive().isTablet;
-
-/// Returns `true` if the current screen width is in the desktop range.
-///
-/// Equivalent to: `PxResponsive().isDesktop`
-///
-/// Example:
-/// ```dart
-/// if (isDesktop) {
-///   return DesktopLayout();
-/// }
-/// ```
-bool get isDesktop => PxResponsive().isDesktop;
-
-/// Returns the current device type as [PxDeviceType] enum.
-///
-/// Equivalent to: `PxResponsive().deviceType`
-///
-/// Example:
-/// ```dart
-/// switch (deviceType) {
-///   case PxDeviceType.mobile:
-///     // Mobile code
-///   case PxDeviceType.tablet:
-///     // Tablet code
-///   case PxDeviceType.desktop:
-///     // Desktop code
-/// }
-/// ```
-PxDeviceType get deviceType => PxResponsive().deviceType;
-
-/// Returns the current screen width in logical pixels.
-///
-/// This is the actual screen width, not affected by [PxResponsiveConfig.maxWidth].
-///
-/// Equivalent to: `PxResponsive().screenWidth`
-double get screenWidth => PxResponsive().screenWidth;
-
-/// Returns the current screen height in logical pixels.
-///
-/// Equivalent to: `PxResponsive().screenHeight`
-double get screenHeight => PxResponsive().screenHeight;
-
-/// Returns the effective width used for scaling calculations.
-///
-/// When [PxResponsiveConfig.maxWidth] is set, this returns min(screenWidth, maxWidth).
-/// Otherwise, it returns the actual screen width.
-///
-/// Equivalent to: `PxResponsive().effectiveWidth`
-///
-/// Example:
-/// ```dart
-/// // With maxWidth: 1920
-/// print('Actual: $screenWidth'); // 2560
-/// print('Effective: $effectiveWidth'); // 1920
-/// ```
-double get effectiveWidth => PxResponsive().effectiveWidth;
-
-/// Returns `true` if the screen is in landscape orientation.
-///
-/// Equivalent to: `PxResponsive().isLandscape`
-bool get isLandscape => PxResponsive().isLandscape;
-
-/// Returns `true` if the screen is in portrait orientation.
-///
-/// Equivalent to: `PxResponsive().isPortrait`
-bool get isPortrait => PxResponsive().isPortrait;
-
-/// Returns the current screen orientation as a [PxOrientation] enum.
-///
-/// Equivalent to: `PxResponsive().orientation`
-PxOrientation get orientation => PxResponsive().orientation;
-
-// ============================================================================
-// GLOBAL FUNCTIONS
-// ============================================================================
-
-/// Returns the appropriate value based on current device type.
-///
-/// The [mobile] value is required and serves as the fallback.
-/// If [tablet] is null, [mobile] will be used for tablet screens.
-/// If [desktop] is null, [tablet] or [mobile] will be used for desktop screens.
-///
-/// Example:
-/// ```dart
-/// int columns = responsiveValue(
-///   mobile: 1,
-///   tablet: 2,
-///   desktop: 4,
-/// );
-/// ```
-T responsiveValue<T>({
-  required T mobile,
-  T? tablet,
-  T? desktop,
-}) {
-  return PxResponsive().value(
-    mobile: mobile,
-    tablet: tablet,
-    desktop: desktop,
-  );
-}
-
-/// Returns the appropriate value based on the current screen orientation.
-///
-/// Example:
-/// ```dart
-/// double padding = orientationValue(portrait: 16.0, landscape: 24.0);
-/// ```
-T orientationValue<T>({required T portrait, required T landscape}) =>
-    PxResponsive().orientationValue(portrait: portrait, landscape: landscape);
+import 'px_responsive_data.dart';
+import 'px_responsive_scope.dart';
 
 // ============================================================================
 // NUM EXTENSIONS - Core responsive scaling
@@ -174,6 +38,12 @@ T orientationValue<T>({required T portrait, required T landscape}) =>
 /// // On 2560px screen
 /// 200.w // = 200 * (1920 / 1920) = 200 (capped at maxWidth)
 /// ```
+///
+/// These extensions have no [BuildContext] to read through, so they always
+/// read the [PxResponsive] singleton (the static path). They stay reactive
+/// to screen size changes through `PxResponsiveWrapper.forceRebuildOnChange`
+/// (on by default) rather than through an [InheritedWidget] dependency —
+/// see that flag's docs for what this means for a resize-heavy desktop app.
 extension PxResponsiveNumExtension on num {
   // ==================== Core Scaling ====================
 
@@ -447,7 +317,7 @@ extension PxResponsiveRelativeExtension on num {
       return (this / 100) * parentSize.width;
     }
     // Fallback: use effective screen width
-    return (this / 100) * PxResponsive().effectiveWidth;
+    return (this / 100) * pxDataOf(context).effectiveWidth;
   }
 
   /// Returns this value as a percentage of the parent's height.
@@ -469,7 +339,7 @@ extension PxResponsiveRelativeExtension on num {
       return (this / 100) * parentSize.height;
     }
     // Fallback: use screen height
-    return (this / 100) * PxResponsive().screenHeight;
+    return (this / 100) * pxDataOf(context).screenHeight;
   }
 }
 
@@ -532,6 +402,41 @@ extension PxResponsiveEdgeInsetsExtension on EdgeInsets {
 }
 
 // ============================================================================
+// EDGEINSETSDIRECTIONAL EXTENSIONS
+// ============================================================================
+
+/// Extensions on [EdgeInsetsDirectional] for responsive scaling.
+///
+/// Mirrors [PxResponsiveEdgeInsetsExtension], for code that uses
+/// `start`/`end` rather than `left`/`right` to support RTL layouts.
+extension PxResponsiveEdgeInsetsDirectionalExtension on EdgeInsetsDirectional {
+  /// Returns a new [EdgeInsetsDirectional] with all values scaled by width factor.
+  EdgeInsetsDirectional get w => copyWith(
+        start: start * PxResponsive().scaleW,
+        top: top * PxResponsive().scaleW,
+        end: end * PxResponsive().scaleW,
+        bottom: bottom * PxResponsive().scaleW,
+      );
+
+  /// Returns a new [EdgeInsetsDirectional] with `start`/`end` scaled by
+  /// width, and `top`/`bottom` scaled by height.
+  EdgeInsetsDirectional get scaled => copyWith(
+        start: start * PxResponsive().scaleW,
+        top: top * PxResponsive().scaleH,
+        end: end * PxResponsive().scaleW,
+        bottom: bottom * PxResponsive().scaleH,
+      );
+
+  /// Returns a new [EdgeInsetsDirectional] with all values scaled by radius factor.
+  EdgeInsetsDirectional get r => copyWith(
+        start: start * PxResponsive().scaleR,
+        top: top * PxResponsive().scaleR,
+        end: end * PxResponsive().scaleR,
+        bottom: bottom * PxResponsive().scaleR,
+      );
+}
+
+// ============================================================================
 // SIZE EXTENSIONS
 // ============================================================================
 
@@ -585,17 +490,15 @@ extension PxResponsiveSizeExtension on Size {
 }
 
 // ============================================================================
-// BORDERRADIUS EXTENSIONS
-// ============================================================================
-
-// ============================================================================
 // BUILDCONTEXT EXTENSIONS
 // ============================================================================
 
-/// Extensions on [BuildContext] for convenient responsive access.
+/// Extensions on [BuildContext] for convenient, scope-aware responsive access.
 ///
-/// These extensions expose the most commonly used responsive properties
-/// directly on [BuildContext], following idiomatic Flutter patterns.
+/// Unlike the deprecated global getters, [responsive] and the shorthands
+/// below read through [PxResponsiveScope] when [context] is beneath one
+/// (creating a proper rebuild dependency), falling back to the
+/// [PxResponsive] singleton otherwise.
 ///
 /// Example:
 /// ```dart
@@ -606,32 +509,35 @@ extension PxResponsiveSizeExtension on Size {
 /// }
 /// ```
 extension PxResponsiveContextExtension on BuildContext {
-  /// The singleton [PxResponsive] instance.
-  PxResponsive get responsive => PxResponsive();
+  /// The current [PxResponsiveData] snapshot available to this context.
+  PxResponsiveData get responsive => pxDataOf(this);
 
   /// Returns `true` if the current screen is mobile.
-  bool get isMobile => PxResponsive().isMobile;
+  bool get isMobile => responsive.isMobile;
 
   /// Returns `true` if the current screen is tablet.
-  bool get isTablet => PxResponsive().isTablet;
+  bool get isTablet => responsive.isTablet;
 
   /// Returns `true` if the current screen is desktop.
-  bool get isDesktop => PxResponsive().isDesktop;
+  bool get isDesktop => responsive.isDesktop;
 
   /// Returns the current device type as [PxDeviceType].
-  PxDeviceType get deviceType => PxResponsive().deviceType;
+  PxDeviceType get deviceType => responsive.deviceType;
 
   /// Returns the current screen width in logical pixels.
-  double get screenWidth => PxResponsive().screenWidth;
+  double get screenWidth => responsive.screenWidth;
 
   /// Returns the current screen height in logical pixels.
-  double get screenHeight => PxResponsive().screenHeight;
+  double get screenHeight => responsive.screenHeight;
 
   /// Returns `true` if the screen is in landscape orientation.
-  bool get isLandscape => PxResponsive().isLandscape;
+  bool get isLandscape => responsive.isLandscape;
 
   /// Returns `true` if the screen is in portrait orientation.
-  bool get isPortrait => PxResponsive().isPortrait;
+  bool get isPortrait => responsive.isPortrait;
+
+  /// Returns the current screen orientation as a [PxOrientation] enum.
+  PxOrientation get orientation => responsive.orientation;
 }
 
 // ============================================================================
@@ -673,20 +579,29 @@ extension PxResponsiveTextStyleExtension on TextStyle {
 extension PxResponsiveIconExtension on Icon {
   /// Returns a new [Icon] with its size scaled by [PxResponsive.scaleSp].
   ///
-  /// Falls back to 24 logical pixels if [size] is null.
+  /// Falls back to 24 logical pixels if [size] is null. Every other field
+  /// is forwarded unchanged.
   Icon get responsive => Icon(
         icon,
+        key: key,
         size: (size ?? 24) * PxResponsive().scaleSp,
-        color: color,
         fill: fill,
         weight: weight,
         grade: grade,
         opticalSize: opticalSize,
+        color: color,
         shadows: shadows,
         semanticLabel: semanticLabel,
         textDirection: textDirection,
+        applyTextScaling: applyTextScaling,
+        blendMode: blendMode,
+        fontWeight: fontWeight,
       );
 }
+
+// ============================================================================
+// BORDERRADIUS EXTENSIONS
+// ============================================================================
 
 /// Extensions on [BorderRadius] for responsive scaling.
 ///

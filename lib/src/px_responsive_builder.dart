@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'px_responsive_config.dart';
-import 'px_responsive_core.dart';
+import 'px_responsive_scope.dart';
 
 // ============================================================================
 // RESPONSIVE BUILDER - Build different widgets per device type
@@ -59,11 +59,11 @@ class PxResponsiveBuilder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final responsive = PxResponsive();
-    if (responsive.isDesktop) {
+    final data = pxDataOf(context);
+    if (data.isDesktop) {
       return (desktop ?? tablet ?? mobile)(context);
     }
-    if (responsive.isTablet) {
+    if (data.isTablet) {
       return (tablet ?? mobile)(context);
     }
     return mobile(context);
@@ -135,11 +135,11 @@ class PxResponsiveValue<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final responsive = PxResponsive();
+    final data = pxDataOf(context);
     T value;
-    if (responsive.isDesktop) {
+    if (data.isDesktop) {
       value = desktop ?? tablet ?? mobile;
-    } else if (responsive.isTablet) {
+    } else if (data.isTablet) {
       value = tablet ?? mobile;
     } else {
       value = mobile;
@@ -305,11 +305,11 @@ class PxResponsiveVisibility extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final responsive = PxResponsive();
+    final data = pxDataOf(context);
     bool isVisible;
-    if (responsive.isDesktop) {
+    if (data.isDesktop) {
       isVisible = visibleOnDesktop;
-    } else if (responsive.isTablet) {
+    } else if (data.isTablet) {
       isVisible = visibleOnTablet;
     } else {
       isVisible = visibleOnMobile;

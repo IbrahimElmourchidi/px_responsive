@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'px_responsive_core.dart';
+import 'px_responsive_scope.dart';
 
 // ============================================================================
 // RESPONSIVE GRID WIDGET
@@ -32,6 +32,22 @@ import 'px_responsive_core.dart';
 ///   spacing: 12.r,
 ///   childAspectRatio: 3 / 4,
 ///   children: items,
+/// )
+/// ```
+///
+/// ## Lazy Building
+///
+/// The default constructor takes an eagerly-built `children` list, which
+/// defeats [GridView.builder]'s laziness for very long lists. Use
+/// [PxResponsiveGrid.builder] to build items on demand instead:
+///
+/// ```dart
+/// PxResponsiveGrid.builder(
+///   mobileColumns: 2,
+///   desktopColumns: 4,
+///   spacing: 12.r,
+///   itemCount: products.length,
+///   itemBuilder: (context, index) => ProductCard(products[index]),
 /// )
 /// ```
 class PxResponsiveGrid extends StatelessWidget {
@@ -76,10 +92,19 @@ class PxResponsiveGrid extends StatelessWidget {
   /// An optional scroll controller.
   final ScrollController? controller;
 
-  /// The widgets to lay out in the grid.
-  final List<Widget> children;
+  /// The widgets to lay out in the grid. Non-null only when constructed via
+  /// the default (eager) constructor.
+  final List<Widget>? children;
 
-  /// Creates a responsive grid widget.
+  /// The number of items to build. Non-null only when constructed via
+  /// [PxResponsiveGrid.builder].
+  final int? itemCount;
+
+  /// Builds the item at the given index. Non-null only when constructed via
+  /// [PxResponsiveGrid.builder].
+  final IndexedWidgetBuilder? itemBuilder;
+
+  /// Creates a responsive grid widget from an eagerly-built [children] list.
   const PxResponsiveGrid({
     super.key,
     required this.mobileColumns,
@@ -92,20 +117,41 @@ class PxResponsiveGrid extends StatelessWidget {
     this.physics,
     this.controller,
     required this.children,
-  });
+  })  : itemCount = null,
+        itemBuilder = null;
+
+  /// Creates a responsive grid widget that builds its [itemCount] items
+  /// lazily via [itemBuilder], preserving [GridView.builder]'s laziness for
+  /// long lists.
+  const PxResponsiveGrid.builder({
+    super.key,
+    required this.mobileColumns,
+    this.tabletColumns,
+    this.desktopColumns,
+    required this.spacing,
+    this.runSpacing,
+    this.childAspectRatio = 1.0,
+    this.shrinkWrap = false,
+    this.physics,
+    this.controller,
+    required this.itemCount,
+    required this.itemBuilder,
+  }) : children = null;
 
   @override
   Widget build(BuildContext context) {
-    final responsive = PxResponsive();
+    final data = pxDataOf(context);
     final int columns;
 
-    if (responsive.isDesktop) {
+    if (data.isDesktop) {
       columns = desktopColumns ?? tabletColumns ?? mobileColumns;
-    } else if (responsive.isTablet) {
+    } else if (data.isTablet) {
       columns = tabletColumns ?? mobileColumns;
     } else {
       columns = mobileColumns;
     }
+
+    final resolvedChildren = children;
 
     return GridView.builder(
       shrinkWrap: shrinkWrap,
@@ -117,8 +163,10 @@ class PxResponsiveGrid extends StatelessWidget {
         mainAxisSpacing: runSpacing ?? spacing,
         childAspectRatio: childAspectRatio,
       ),
-      itemCount: children.length,
-      itemBuilder: (context, index) => children[index],
+      itemCount: resolvedChildren?.length ?? itemCount!,
+      itemBuilder: resolvedChildren != null
+          ? (context, index) => resolvedChildren[index]
+          : itemBuilder!,
     );
   }
 }
